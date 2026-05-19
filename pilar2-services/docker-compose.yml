@@ -1,0 +1,63 @@
+services:
+
+  # =============================================
+  # RabbitMQ - Cola de mensajes
+  # Puerto 5672: AMQP (comunicación con servicios)
+  # Puerto 15672: Management UI (http://localhost:15672)
+  # =============================================
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    container_name: blockchain-rabbitmq
+    hostname: blockchain-rabbit
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-admin123}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-blockchain}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - blockchain-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================
+  # Redis - Base de datos de la blockchain
+  # Puerto 6379: conexión desde servicios
+  # Persistencia: AOF + RDB habilitados
+  # =============================================
+  redis:
+    image: redis:8-alpine
+    container_name: blockchain-redis
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASS:-redis123}
+      --appendonly yes
+      --appendfsync everysec
+      --save 60 1
+    volumes:
+      - redis_data:/data
+    networks:
+      - blockchain-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASS:-redis123}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  rabbitmq_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  blockchain-net:
+    driver: bridge
