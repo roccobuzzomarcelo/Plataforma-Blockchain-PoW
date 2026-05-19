@@ -1,0 +1,120 @@
+# ================================
+# JAVA / MAVEN
+# ================================
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.logs
+.mvn/wrapper/maven-wrapper.jar
+release.properties
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+
+# ================================
+# SPRING BOOT
+# ================================
+*.pid
+spring-shell.log
+application-local.yml
+application-local.properties
+
+# ================================
+# CUDA / C++
+# ================================
+*.o
+*.a
+*.so
+*.out
+*.ptx
+*.cubin
+*.fatbin
+gpu-miner/build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# ================================
+# REACT / NODE
+# ================================
+node_modules/
+dist/
+build/
+.npm
+.eslintcache
+*.tsbuildinfo
+
+# ================================
+# DOCKER
+# ================================
+.docker/
+
+# ================================
+# ENTORNO Y SECRETOS
+# ================================
+.env
+.env.*
+!.env.example        # este sí se sube como plantilla
+*.pem
+*.key
+*.cert
+secrets/
+
+# ================================
+# OPENTOFU / TERRAFORM
+# ================================
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+*.tfplan
+.terraform.lock.hcl
+override.tf
+override.tf.json
+
+# ================================
+# RESULTADOS Y BENCHMARKS
+# ================================
+pilar1-miner/benchmarks/results/*.csv
+pilar1-miner/benchmarks/results/*.json
+docs/resultados/graficos/*.png
+docs/resultados/graficos/*.svg
+
+# ================================
+# IDEs
+# ================================
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Eclipse
+.eclipse/
+.classpath
+.project
+.settings/
+
+# ================================
+# SISTEMA OPERATIVO
+# ================================
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Linux
+*~
