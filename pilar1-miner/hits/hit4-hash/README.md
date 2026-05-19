@@ -50,9 +50,9 @@ nvcc --cudart shared md5_gpu.cu -o md5_gpu
 
 | Input        | MD5 (CUDA GPU)                     | md5sum (referencia)                | Coincide |
 | ------------ | ---------------------------------- | ---------------------------------- | -------- |
-| `hello`      | `5d41402abc4b2a76b9719d911017c592` | `5d41402abc4b2a76b9719d911017c592` | ✅        |
-| `blockchain` | `5510a843bc1b7acb9507a5f71de51b98` | `5510a843bc1b7acb9507a5f71de51b98` | ✅        |
-| `hola mundo` | `0ad066a5d29f3f2a2a1c7c17dd082a79` | `0ad066a5d29f3f2a2a1c7c17dd082a79` | ✅        |
+| `hello`      | `5d41402abc4b2a76b9719d911017c592` | `5d41402abc4b2a76b9719d911017c592` | ✓        |
+| `blockchain` | `5510a843bc1b7acb9507a5f71de51b98` | `5510a843bc1b7acb9507a5f71de51b98` | ✓        |
+| `hola mundo` | `0ad066a5d29f3f2a2a1c7c17dd082a79` | `0ad066a5d29f3f2a2a1c7c17dd082a79` | ✓        |
 
 ### Verificación
 Los hashes fueron verificados usando `md5sum` dentro del contenedor:
