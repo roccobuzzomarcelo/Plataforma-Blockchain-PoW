@@ -1,44 +1,19 @@
 {
-    "test_cases": [
-        {
-            "id": 1,
-            "cadena": "blockchain",
-            "prefijo": "0"
-        },
-        {
-            "id": 2,
-            "cadena": "blockchain",
-            "prefijo": "00"
-        },
-        {
-            "id": 3,
-            "cadena": "blockchain",
-            "prefijo": "000"
-        },
-        {
-            "id": 4,
-            "cadena": "hello",
-            "prefijo": "0"
-        },
-        {
-            "id": 5,
-            "cadena": "hello",
-            "prefijo": "00"
-        },
-        {
-            "id": 6,
-            "cadena": "unlu2025",
-            "prefijo": "0"
-        },
-        {
-            "id": 7,
-            "cadena": "unlu2025",
-            "prefijo": "00"
-        },
-        {
-            "id": 8,
-            "cadena": "unlu2025",
-            "prefijo": "000"
-        }
-    ]
+  "test_cases": [
+    { "id": 1,  "cadena": "blockchain", "prefijo": "0" },
+    { "id": 2,  "cadena": "blockchain", "prefijo": "00" },
+    { "id": 3,  "cadena": "blockchain", "prefijo": "000" },
+    { "id": 4,  "cadena": "blockchain", "prefijo": "0000" },
+    { "id": 5,  "cadena": "blockchain", "prefijo": "00000" },
+    { "id": 6,  "cadena": "hello",      "prefijo": "0" },
+    { "id": 7,  "cadena": "hello",      "prefijo": "00" },
+    { "id": 8,  "cadena": "hello",      "prefijo": "000" },
+    { "id": 9,  "cadena": "hello",      "prefijo": "0000" },
+    { "id": 10, "cadena": "hello",      "prefijo": "00000" },
+    { "id": 11, "cadena": "unlu2026",   "prefijo": "0" },
+    { "id": 12, "cadena": "unlu2026",   "prefijo": "00" },
+    { "id": 13, "cadena": "unlu2026",   "prefijo": "000" },
+    { "id": 14, "cadena": "unlu2026",   "prefijo": "0000" },
+    { "id": 15, "cadena": "unlu2026",   "prefijo": "00000" }
+  ]
 }
