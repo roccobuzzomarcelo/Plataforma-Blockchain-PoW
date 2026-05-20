@@ -9,82 +9,97 @@ blockchain-pow/
 │
 ├── pilar1-miner/
 │   │
-│   ├── cpu-miner/                          # Minero CPU en Java 21
-│   │   ├── src/
-│   │   │   └── main/java/com/blockchain/miner/
-│   │   │       ├── CpuMinerApplication.java
-│   │   │       ├── miner/
-│   │   │       │   ├── CpuMiner.java       # Lógica con ExecutorService
-│   │   │       │   └── MinerResult.java    # Modelo resultado (record)
-│   │   │       └── hash/
-│   │   │           └── HashUtils.java      # MD5 / SHA-256 utils
+│   ├── cpu-miner/
+│   │   ├── src/main/java/com/blockchain/miner/
+│   │   │   ├── CpuMinerApplication.java
+│   │   │   ├── miner/
+│   │   │   │   ├── CpuMiner.java
+│   │   │   │   └── MinerResult.java
+│   │   │   └── hash/
+│   │   │       └── HashUtils.java
 │   │   └── pom.xml
 │   │
-│   ├── gpu-miner/                          # Minero GPU en CUDA
+│   ├── gpu-miner/                          # Se completa en Pilar 2
 │   │   ├── src/
-│   │   │   ├── main.cu                     # Entry point CUDA
-│   │   │   ├── miner.cu                    # Lógica de minería GPU
-│   │   │   └── hash_utils.cuh             # Header utils de hash
-│   │   ├── CMakeLists.txt
+│   │   │   └── range_miner.cu             # Basado en Hit #7
 │   │   └── Dockerfile                      # Basado en GPGPU-Sim
 │   │
-│   ├── hits/                               # Un directorio por Hit del enunciado
+│   ├── hits/
 │   │   ├── hit1-setup/
-│   │   │   └── README.md                   # Documentación del entorno
+│   │   │   └── README.md
 │   │   ├── hit2-hello-world/
 │   │   │   └── hello.cu
 │   │   ├── hit3-libs/
-│   │   │   ├── thrust_example.cu
-│   │   │   └── README.md                   # Análisis cccl vs CUDA puro
+│   │   │   ├── thrust_host_only.cu
+│   │   │   ├── thrust_vectors.cu
+│   │   │   └── README.md
 │   │   ├── hit4-hash/
-│   │   │   └── md5_gpu.cu
+│   │   │   ├── md5_gpu.cu
+│   │   │   └── README.md
 │   │   ├── hit5-brute-force/
-│   │   │   └── brute_force.cu
+│   │   │   ├── brute_force.cu
+│   │   │   └── README.md
 │   │   ├── hit6-prefix-length/
 │   │   │   ├── prefix_test.cu
-│   │   │   └── README.md                   # Análisis longitud vs tiempo
+│   │   │   └── README.md
 │   │   └── hit7-range-limits/
-│   │       └── range_miner.cu
+│   │       ├── range_miner.cu
+│   │       └── README.md
 │   │
 │   ├── benchmarks/
-│   │   ├── run_benchmarks.sh               # Script comparativa GPU vs CPU
-│   │   └── results/                        # CSVs y gráficos de resultados
+│   │   ├── run_benchmarks.sh
+│   │   └── results/
 │   │
 │   └── tests/
-│       ├── test_cases.json                 # Batería de inputs de prueba
-│       └── validate.sh                     # Valida outputs GPU vs CPU
+│       ├── test_cases.json
+│       └── validate.sh
 │
 ├── pilar2-services/
 │   │
-│   ├── coordinator/                        # Nodo Coordinador de Tareas (NCT)
-│   │   ├── src/main/java/com/blockchain/coordinator/
-│   │   │   ├── CoordinatorApplication.java
+│   ├── shared/                             # Módulo Maven compartido
+│   │   ├── src/main/java/com/blockchain/shared/
+│   │   │   ├── model/
+│   │   │   │   ├── Transaction.java
+│   │   │   │   ├── Block.java
+│   │   │   │   └── MiningTask.java
+│   │   │   ├── event/
+│   │   │   │   ├── MiningResultEvent.java
+│   │   │   │   └── BlockMinedEvent.java
+│   │   │   └── util/
+│   │   │       └── HashUtils.java
+│   │   └── pom.xml
+│   │
+│   ├── blockchain-api/                     # Backend REST + WebSocket
+│   │   ├── src/main/java/com/blockchain/api/
+│   │   │   ├── BlockchainApiApplication.java
+│   │   │   ├── config/
+│   │   │   │   ├── RedisConfig.java
+│   │   │   │   ├── WebSocketConfig.java
+│   │   │   │   └── CorsConfig.java
 │   │   │   ├── controller/
-│   │   │   │   └── BlockController.java    # REST API del coordinador
-│   │   │   ├── service/
-│   │   │   │   ├── BlockService.java       # Lógica de formación de bloques
-│   │   │   │   └── ConsensusService.java   # Algoritmo de consenso
-│   │   │   ├── messaging/
-│   │   │   │   └── TaskPublisher.java      # Publica tareas en RabbitMQ
-│   │   │   └── model/
-│   │   │       ├── Block.java              # Record: bloque de la chain
-│   │   │       └── MiningTask.java         # Record: tarea enviada a workers
+│   │   │   │   ├── ChainController.java
+│   │   │   │   └── WebSocketController.java
+│   │   │   └── service/
+│   │   │       └── BlockchainService.java
 │   │   ├── src/main/resources/
 │   │   │   └── application.yml
 │   │   ├── Dockerfile
 │   │   └── pom.xml
 │   │
-│   ├── worker/                             # Nodo Worker (minero CPU Java)
-│   │   ├── src/main/java/com/blockchain/worker/
-│   │   │   ├── WorkerApplication.java
-│   │   │   ├── messaging/
-│   │   │   │   ├── TaskConsumer.java       # Consume tareas de RabbitMQ
-│   │   │   │   └── ResultPublisher.java    # Publica resultado al coordinator
-│   │   │   ├── miner/
-│   │   │   │   ├── PoWMiner.java           # ExecutorService + ThreadPool
-│   │   │   │   └── HashUtils.java
-│   │   │   └── model/
-│   │   │       └── MiningResult.java       # Record: resultado del PoW
+│   ├── coordinator/                        # Nodo Coordinador de Tareas (NCT)
+│   │   ├── src/main/java/com/blockchain/coordinator/
+│   │   │   ├── CoordinatorApplication.java
+│   │   │   ├── config/
+│   │   │   │   ├── RabbitMQConfig.java
+│   │   │   │   └── RedisConfig.java
+│   │   │   ├── controller/
+│   │   │   │   └── CoordinatorController.java
+│   │   │   ├── service/
+│   │   │   │   ├── BlockService.java
+│   │   │   │   └── ConsensusService.java
+│   │   │   └── messaging/
+│   │   │       ├── TaskPublisher.java
+│   │   │       └── ResultConsumer.java
 │   │   ├── src/main/resources/
 │   │   │   └── application.yml
 │   │   ├── Dockerfile
@@ -93,28 +108,28 @@ blockchain-pow/
 │   ├── transaction-pool/                   # Pool de Transacciones (TrP)
 │   │   ├── src/main/java/com/blockchain/txpool/
 │   │   │   ├── TransactionPoolApplication.java
+│   │   │   ├── config/
+│   │   │   │   └── RabbitMQConfig.java
 │   │   │   ├── controller/
-│   │   │   │   └── TransactionController.java  # Recibe txs nuevas
-│   │   │   ├── service/
-│   │   │   │   ├── PoolService.java            # Gestiona pool de txs
-│   │   │   │   └── SplitService.java           # Fragmenta rangos de nonce
-│   │   │   └── model/
-│   │   │       └── Transaction.java            # Record: transferencia A→B
+│   │   │   │   └── TransactionController.java
+│   │   │   └── service/
+│   │   │       ├── PoolService.java
+│   │   │       └── SplitService.java
 │   │   ├── src/main/resources/
 │   │   │   └── application.yml
 │   │   ├── Dockerfile
 │   │   └── pom.xml
 │   │
-│   ├── blockchain-api/                     # Backend REST (consulta de la chain)
-│   │   ├── src/main/java/com/blockchain/api/
-│   │   │   ├── BlockchainApiApplication.java
-│   │   │   ├── controller/
-│   │   │   │   ├── ChainController.java    # GET bloques, estado de la chain
-│   │   │   │   └── TransactionController.java
-│   │   │   ├── service/
-│   │   │   │   └── ChainService.java       # Lee desde Redis
-│   │   │   └── model/
-│   │   │       └── BlockDTO.java           # Record: respuesta al frontend
+│   ├── worker/                             # Nodo Worker (minero CPU Java)
+│   │   ├── src/main/java/com/blockchain/worker/
+│   │   │   ├── WorkerApplication.java
+│   │   │   ├── config/
+│   │   │   │   └── RabbitMQConfig.java
+│   │   │   ├── messaging/
+│   │   │   │   ├── TaskConsumer.java
+│   │   │   │   └── ResultPublisher.java
+│   │   │   └── miner/
+│   │   │       └── PoWMiner.java
 │   │   ├── src/main/resources/
 │   │   │   └── application.yml
 │   │   ├── Dockerfile
@@ -124,38 +139,29 @@ blockchain-pow/
 │   │   ├── src/
 │   │   │   ├── App.jsx
 │   │   │   ├── components/
-│   │   │   │   ├── BlockList.jsx           # Visualiza la cadena de bloques
-│   │   │   │   ├── TransactionForm.jsx     # Envía nuevas transacciones
-│   │   │   │   └── MinerStatus.jsx         # Estado de los workers
+│   │   │   │   ├── BlockList.jsx
+│   │   │   │   ├── TransactionForm.jsx
+│   │   │   │   └── MinerStatus.jsx
 │   │   │   └── services/
-│   │   │       └── api.js                  # Llamadas a blockchain-api
+│   │   │       └── api.js
 │   │   ├── package.json
 │   │   ├── Dockerfile
 │   │   └── nginx.conf
 │   │
-│   ├── shared/                             # Modelos y utils compartidos entre servicios
-│   │   └── src/main/java/com/blockchain/shared/
-│   │       ├── model/
-│   │       │   ├── Block.java
-│   │       │   └── Transaction.java
-│   │       └── util/
-│   │           └── HashUtils.java
-│   │   └── pom.xml
-│   │
-│   └── docker-compose.yml                  # Levanta todo el stack localmente
+│   └── docker-compose.yml
 │
 ├── pilar3-infra/
 │   │
-│   ├── opentofu/                           # Infraestructura como código (GKE)
-│   │   ├── main.tf                         # Cluster GKE principal
+│   ├── opentofu/
+│   │   ├── main.tf
 │   │   ├── variables.tf
 │   │   ├── outputs.tf
 │   │   └── modules/
-│   │       ├── gke-cluster/                # Módulo del cluster
-│   │       ├── node-groups/                # Nodegroups infra y apps
-│   │       └── external-vms/              # VMs para GPU workers
+│   │       ├── gke-cluster/
+│   │       ├── node-groups/
+│   │       └── external-vms/
 │   │
-│   ├── k8s/                               # Manifests de Kubernetes
+│   ├── k8s/
 │   │   ├── namespace.yaml
 │   │   ├── infra/
 │   │   │   ├── rabbitmq.yaml
@@ -167,21 +173,24 @@ blockchain-pow/
 │   │       ├── blockchain-api.yaml
 │   │       └── frontend.yaml
 │   │
-│   ├── pipelines/                          # GitHub Actions
-│   │   ├── pipeline1-infra.yml             # Construye entorno K8s
-│   │   ├── pipeline2-services.yml          # Despliega Redis + RabbitMQ
-│   │   ├── pipeline3-apps.yml             # Despliega microservicios
-│   │   └── pipeline4-workers.yml          # Despliega VMs workers dinámicas
+│   ├── pipelines/
+│   │   ├── pipeline1-infra.yml
+│   │   ├── pipeline2-services.yml
+│   │   ├── pipeline3-apps.yml
+│   │   └── pipeline4-workers.yml
 │   │
-│   └── tests-load/                         # Pruebas de carga
-│       ├── load_test.sh                    # Script principal
+│   └── tests-load/
+│       ├── load_test.sh
 │       └── scenarios/
-│           ├── bulk_transactions.json      # 1 a 100.000 transacciones
-│           ├── prefix_difficulty.json      # Prefijo 1 a 8 caracteres
-│           └── pool_fragmentation.json     # Fragmentación 1% a 50%
+│           ├── bulk_transactions.json
+│           ├── prefix_difficulty.json
+│           └── pool_fragmentation.json
 │
 └── docs/
     ├── informe/
+    │   ├── assets/
+    │   │   ├── pilar1/
+    │   │   └── pilar2/
     │   ├── pilar1.md
     │   ├── pilar2.md
     │   └── pilar3.md
