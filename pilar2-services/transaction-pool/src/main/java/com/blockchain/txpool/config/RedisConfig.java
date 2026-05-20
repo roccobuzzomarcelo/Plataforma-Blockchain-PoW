@@ -1,4 +1,4 @@
-package com.blockchain.api.config;
+package com.blockchain.txpool.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;

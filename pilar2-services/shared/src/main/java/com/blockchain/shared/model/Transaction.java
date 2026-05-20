@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.Instant;
 import java.util.UUID;
 
+@com.fasterxml.jackson.databind.annotation.JsonDeserialize
 public record Transaction(
         String id,
         String sender,
@@ -12,8 +13,13 @@ public record Transaction(
         @JsonFormat(shape = JsonFormat.Shape.STRING) Instant timestamp,
         TransactionType type) {
     public enum TransactionType {
-        TRANSFER, // transacción normal entre usuarios
-        COINBASE // recompensa al worker ganador
+        TRANSFER,
+        COINBASE;
+
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public static TransactionType fromValue(String value) {
+            return valueOf(value.toUpperCase());
+        }
     }
 
     // Factory para transacción normal
