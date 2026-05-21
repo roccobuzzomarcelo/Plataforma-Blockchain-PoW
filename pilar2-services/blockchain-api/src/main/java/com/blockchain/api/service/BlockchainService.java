@@ -5,7 +5,7 @@ import com.blockchain.shared.model.Transaction;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -22,29 +22,31 @@ public class BlockchainService {
     private static final String TX_KEY_PREFIX = "tx:";
     private static final String TX_PENDING_KEY = "tx:pending";
 
-    private final StringRedisTemplate stringRedisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
 
-    public BlockchainService(StringRedisTemplate stringRedisTemplate,
+    public BlockchainService(RedisTemplate<String, Object> redisTemplate,
             ObjectMapper objectMapper) {
-        this.stringRedisTemplate = stringRedisTemplate;
+        this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
     }
 
     public List<Block> getAllBlocks() {
-        Set<String> blockKeys = stringRedisTemplate.opsForSet().members(BLOCKS_INDEX_KEY);
-        if (blockKeys == null || blockKeys.isEmpty())
+        Set<Object> indices = redisTemplate.opsForSet().members(BLOCKS_INDEX_KEY);
+        if (indices == null || indices.isEmpty())
             return List.of();
 
         List<Block> blocks = new ArrayList<>();
-        for (String key : blockKeys) {
-            String json = stringRedisTemplate.opsForValue().get(BLOCK_KEY_PREFIX + key);
-            if (json != null) {
-                try {
-                    blocks.add(objectMapper.readValue(json, Block.class));
-                } catch (Exception e) {
-                    log.error("Error deserializando bloque {}: {}", key, e.getMessage());
-                }
+        for (Object idx : indices) {
+            Object raw = redisTemplate.opsForValue().get(BLOCK_KEY_PREFIX + idx);
+            if (raw == null)
+                continue;
+            try {
+                Block block = (raw instanceof Block b) ? b
+                        : objectMapper.convertValue(raw, Block.class);
+                blocks.add(block);
+            } catch (Exception e) {
+                log.error("Error deserializando bloque {}: {}", idx, e.getMessage());
             }
         }
 
@@ -53,11 +55,12 @@ public class BlockchainService {
     }
 
     public Block getBlock(int index) {
-        String json = stringRedisTemplate.opsForValue().get(BLOCK_KEY_PREFIX + index);
-        if (json == null)
+        Object raw = redisTemplate.opsForValue().get(BLOCK_KEY_PREFIX + index);
+        if (raw == null)
             return null;
         try {
-            return objectMapper.readValue(json, Block.class);
+            return (raw instanceof Block b) ? b
+                    : objectMapper.convertValue(raw, Block.class);
         } catch (Exception e) {
             log.error("Error deserializando bloque {}: {}", index, e.getMessage());
             return null;
@@ -70,27 +73,29 @@ public class BlockchainService {
     }
 
     public List<Transaction> getPendingTransactions() {
-        Set<String> txIds = stringRedisTemplate.opsForSet().members(TX_PENDING_KEY);
+        Set<Object> txIds = redisTemplate.opsForSet().members(TX_PENDING_KEY);
         if (txIds == null || txIds.isEmpty())
             return List.of();
 
         List<Transaction> txs = new ArrayList<>();
-        for (String id : txIds) {
-            String json = stringRedisTemplate.opsForValue().get(TX_KEY_PREFIX + id);
-            if (json != null) {
-                try {
-                    txs.add(objectMapper.readValue(json, Transaction.class));
-                } catch (Exception e) {
-                    log.error("Error deserializando transacción {}: {}", id, e.getMessage());
-                }
+        for (Object id : txIds) {
+            Object raw = redisTemplate.opsForValue().get(TX_KEY_PREFIX + id);
+            if (raw == null)
+                continue;
+            try {
+                Transaction tx = (raw instanceof Transaction t) ? t
+                        : objectMapper.convertValue(raw, Transaction.class);
+                txs.add(tx);
+            } catch (Exception e) {
+                log.error("Error deserializando transacción {}: {}", id, e.getMessage());
             }
         }
         return txs;
     }
 
     public BlockchainStats getStats() {
-        Long blockCount = stringRedisTemplate.opsForSet().size(BLOCKS_INDEX_KEY);
-        Long pendingTxCount = stringRedisTemplate.opsForSet().size(TX_PENDING_KEY);
+        Long blockCount = redisTemplate.opsForSet().size(BLOCKS_INDEX_KEY);
+        Long pendingTxCount = redisTemplate.opsForSet().size(TX_PENDING_KEY);
         Block latest = getLatestBlock();
         return new BlockchainStats(
                 blockCount != null ? blockCount : 0,
