@@ -3,7 +3,6 @@ package com.blockchain.coordinator.service;
 import com.blockchain.shared.model.Block;
 import com.blockchain.shared.model.MiningTask;
 import com.blockchain.shared.model.Transaction;
-import com.blockchain.shared.util.HashUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
