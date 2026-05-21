@@ -8,19 +8,14 @@ import com.blockchain.shared.model.MiningTask;
 import com.blockchain.shared.util.HashUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Algoritmo de consenso:
- * - Acepta el PRIMER resultado válido que llegue para un bloque.
- * - Descarta todos los demás (llegaron tarde).
- * - Verifica el hash recalculando localmente antes de confirmar.
- */
 @Service
 public class ConsensusService {
 
@@ -28,33 +23,28 @@ public class ConsensusService {
 
     private final BlockService blockService;
     private final TaskPublisher taskPublisher;
-    private final SimpMessagingTemplate ws;
+    private final RestTemplate restTemplate;
 
-    // taskId → flag de si ya fue ganado
+    @Value("${services.blockchain-api.url:http://localhost:8080}")
+    private String blockchainApiUrl;
+
     private final ConcurrentHashMap<String, AtomicBoolean> taskResolved = new ConcurrentHashMap<>();
-
-    // taskId → MiningTask activa (para poder verificar)
     private final ConcurrentHashMap<String, MiningTask> activeTasks = new ConcurrentHashMap<>();
 
     public ConsensusService(BlockService blockService,
             TaskPublisher taskPublisher,
-            SimpMessagingTemplate ws) {
+            RestTemplate restTemplate) {
         this.blockService = blockService;
         this.taskPublisher = taskPublisher;
-        this.ws = ws;
+        this.restTemplate = restTemplate;
     }
 
-    /** Registra una tarea como activa cuando es publicada. */
     public void registerTask(MiningTask task) {
         activeTasks.put(task.taskId(), task);
         taskResolved.put(task.taskId(), new AtomicBoolean(false));
         log.debug("Tarea registrada: {}", task.taskId());
     }
 
-    /**
-     * Procesa el resultado de un worker.
-     * Thread-safe: usa CAS para que solo el primer ganador gane.
-     */
     public void processResult(MiningResultEvent result) {
         if (!result.success()) {
             log.debug("Worker {} no encontró nonce en su rango para taskId={}",
@@ -68,7 +58,6 @@ public class ConsensusService {
             return;
         }
 
-        // CAS: solo el primer thread en poner true gana
         if (!resolved.compareAndSet(false, true)) {
             log.debug("Resultado tardío descartado de worker {} para tarea {}",
                     result.workerId(), result.taskId());
@@ -81,29 +70,27 @@ public class ConsensusService {
             return;
         }
 
-        // Verificar el hash localmente (NCT.3)
+        // Verificar hash (NCT.3)
         String recomputedHash = HashUtils.powHash(result.nonce(), result.str(), result.bcContent());
         if (!recomputedHash.equals(result.blockHash())) {
-            log.warn("Hash inválido del worker {}. Esperado: {}, Recibido: {}",
-                    result.workerId(), recomputedHash, result.blockHash());
-            resolved.set(false); // permitir que otro worker intente
+            log.warn("Hash inválido del worker {}", result.workerId());
+            resolved.set(false);
             return;
         }
         if (!recomputedHash.startsWith(task.prefix())) {
-            log.warn("Hash no cumple el prefijo '{}': {}", task.prefix(), recomputedHash);
+            log.warn("Hash no cumple el prefijo '{}'", task.prefix());
             resolved.set(false);
             return;
         }
 
         // Confirmar bloque (NCT.4)
         Instant now = Instant.now();
-        Block confirmed = blockService.confirmBlock(task, result.nonce(),
-                result.blockHash(), result.workerId(), now);
+        Block confirmed = blockService.confirmBlock(
+                task, result.nonce(), result.blockHash(), result.workerId(), now);
 
-        // Limpiar estado interno
         activeTasks.remove(result.taskId());
 
-        // Broadcast WebSocket a todos los clientes
+        // Notificar a blockchain-api para broadcast WebSocket
         BlockMinedEvent event = new BlockMinedEvent(
                 confirmed.index(),
                 confirmed.blockHash(),
@@ -111,7 +98,15 @@ public class ConsensusService {
                 result.nonce(),
                 task.prefix(),
                 50.0);
-        ws.convertAndSend("/topic/blocks", event);
+
+        try {
+            restTemplate.postForEntity(
+                    blockchainApiUrl + "/api/events/block-mined",
+                    event,
+                    Void.class);
+        } catch (Exception e) {
+            log.warn("No se pudo notificar a blockchain-api: {}", e.getMessage());
+        }
 
         log.info("BLOQUE {} CONFIRMADO. Worker ganador: {}, tiempo: {}ms",
                 confirmed.index(), result.workerId(), result.elapsedMs());
