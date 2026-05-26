@@ -1,49 +1,15 @@
 services:
 
-  # =============================================
-  # RabbitMQ - Cola de mensajes
-  # Puerto 5672: AMQP (comunicación con servicios)
-  # Puerto 15672: Management UI (http://localhost:15672)
-  # =============================================
-  rabbitmq:
-    image: rabbitmq:4.1-management
-    container_name: blockchain-rabbitmq
-    hostname: blockchain-rabbit
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-admin123}
-      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-blockchain}
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    networks:
-      - blockchain-net
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # ── Infraestructura ──────────────────────────────
 
-  # =============================================
-  # Redis - Base de datos de la blockchain
-  # Puerto 6379: conexión desde servicios
-  # Persistencia: AOF + RDB habilitados
-  # =============================================
   redis:
     image: redis:8-alpine
     container_name: blockchain-redis
+    command: redis-server --requirepass ${REDIS_PASS:-redis123}
     ports:
       - "6379:6379"
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASS:-redis123}
-      --appendonly yes
-      --appendfsync everysec
-      --save 60 1
     volumes:
-      - redis_data:/data
+      - redis-data:/data
     networks:
       - blockchain-net
     healthcheck:
@@ -52,11 +18,143 @@ services:
       timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    container_name: blockchain-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-admin123}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - blockchain-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ── Aplicaciones ─────────────────────────────────
+
+  blockchain-api:
+    image: blockchain-api:latest
+    container_name: blockchain-api
+    ports:
+      - "8080:8080"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASS: ${REDIS_PASS:-redis123}
+      TRANSACTION_POOL_URL: http://transaction-pool:8082
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - blockchain-net
+    restart: unless-stopped
+
+  coordinator:
+    image: coordinator:latest
+    container_name: blockchain-coordinator
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASS: ${REDIS_PASS:-redis123}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-admin123}
+      MINING_PREFIX: ${MINING_PREFIX:-000}
+      BLOCKCHAIN_API_URL: http://blockchain-api:8080
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - blockchain-net
+    restart: unless-stopped
+
+  transaction-pool:
+    image: transaction-pool:latest
+    container_name: blockchain-transaction-pool
+    ports:
+      - "8082:8082"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASS: ${REDIS_PASS:-redis123}
+      COORDINATOR_URL: http://coordinator:8081
+      MINING_PREFIX: ${MINING_PREFIX:-000}
+      BLOCK_INTERVAL: ${BLOCK_INTERVAL:-60}
+    depends_on:
+      redis:
+        condition: service_healthy
+      coordinator:
+        condition: service_started
+    networks:
+      - blockchain-net
+    restart: unless-stopped
+
+  worker:
+    image: worker:latest
+    container_name: blockchain-worker-1
+    ports:
+      - "8083:8083"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-admin123}
+      WORKER_ID: worker-1
+      WORKER_THREADS: ${WORKER_THREADS:-8}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - blockchain-net
+    restart: unless-stopped
+
+  worker-2:
+    image: worker:latest
+    container_name: blockchain-worker-2
+    ports:
+      - "8084:8083"
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-admin123}
+      WORKER_ID: worker-2
+      WORKER_THREADS: ${WORKER_THREADS:-8}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - blockchain-net
+    restart: unless-stopped
+
+  frontend:
+    image: blockchain-frontend:latest
+    container_name: blockchain-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - blockchain-api
+    networks:
+      - blockchain-net
+    restart: unless-stopped
+
+# ── Volúmenes y red ────────────────────────────────
+
 volumes:
-  rabbitmq_data:
-    driver: local
-  redis_data:
-    driver: local
+  redis-data:
+  rabbitmq-data:
 
 networks:
   blockchain-net:
