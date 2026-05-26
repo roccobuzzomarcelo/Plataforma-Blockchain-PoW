@@ -3,8 +3,6 @@ package com.blockchain.api.controller;
 import com.blockchain.shared.event.BlockMinedEvent;
 
 import org.springframework.lang.NonNull;
-import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 

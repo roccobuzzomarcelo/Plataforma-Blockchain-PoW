@@ -22,6 +22,7 @@ public class ConsensusService {
     private static final Logger log = LoggerFactory.getLogger(ConsensusService.class);
 
     private final BlockService blockService;
+    @SuppressWarnings("unused")
     private final TaskPublisher taskPublisher;
     private final RestTemplate restTemplate;
 

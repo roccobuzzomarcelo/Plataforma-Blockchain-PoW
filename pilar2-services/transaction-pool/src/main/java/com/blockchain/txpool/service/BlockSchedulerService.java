@@ -1,6 +1,5 @@
 package com.blockchain.txpool.service;
 
-import com.blockchain.shared.model.MiningTask;
 import com.blockchain.shared.model.Transaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +20,7 @@ public class BlockSchedulerService {
     private final SplitService splitService;
     private final MinerMonitorService minerMonitor;
     private final RestTemplate restTemplate;
+    @SuppressWarnings("unused")
     private final StringRedisTemplate stringRedisTemplate;
 
     @Value("${services.coordinator.url:http://localhost:8081}")
