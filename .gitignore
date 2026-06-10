@@ -118,3 +118,6 @@ Desktop.ini
 
 # Linux
 *~
+
+# Agregar al .gitignore
+Add-Content .gitignore "`n# ================================`n# GCP CREDENCIALES`n# ================================`n*.json`n.gcp/`n*-key.json"
