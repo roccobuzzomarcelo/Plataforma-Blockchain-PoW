@@ -1,18 +1,20 @@
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:8080';
-const POOL_BASE = 'http://localhost:8082';
+// Rutas relativas: el navegador siempre habla con el mismo origen que sirvió la app.
+//  - Producción (Docker / Kubernetes): las resuelve el proxy de nginx (nginx.conf).
+//  - Desarrollo (npm run dev): las resuelve el proxy de Vite (vite.config.js).
+const http = axios.create({ timeout: 10000 });
 
 export const api = {
-    // Blockchain
-    getBlocks: () => axios.get(`${API_BASE}/api/chain/blocks`),
-    getStats: () => axios.get(`${API_BASE}/api/chain/stats`),
-    getPending: () => axios.get(`${API_BASE}/api/chain/transactions/pending`),
+    // Blockchain (blockchain-api)
+    getBlocks: () => http.get('/api/chain/blocks'),
+    getStats: () => http.get('/api/chain/stats'),
+    getPending: () => http.get('/api/chain/transactions/pending'),
 
-    // Transacciones
-    sendTransaction: (tx) => axios.post(`${POOL_BASE}/api/pool/transactions`, tx),
+    // Transacciones: pasan por blockchain-api, que valida y reenvía al transaction-pool
+    sendTransaction: (tx) => http.post('/api/transactions', tx),
 
-    // Pool
-    flushPool: () => axios.post(`${POOL_BASE}/api/pool/flush`),
-    getPoolStatus: () => axios.get(`${POOL_BASE}/api/pool/status`),
+    // Pool (transaction-pool)
+    flushPool: () => http.post('/api/pool/flush'),
+    getPoolStatus: () => http.get('/api/pool/status'),
 };

@@ -1,6 +1,6 @@
 # Smoke test end-to-end — `smoke-test.ps1`
 
-Script de PowerShell que verifica en un minuto que el stack completo del Pilar 2 funciona de punta a punta: servicios levantados, validación de transacciones, minado distribuido entre workers, integridad criptográfica de la cadena y persistencia de Redis ante una caída abrupta.
+Script de PowerShell que verifica en un minuto que el stack completo del Pilar 2 funciona de punta a punta: servicios levantados, proxy reverso de nginx (REST y WebSocket), validación de transacciones, minado distribuido entre workers, integridad criptográfica de la cadena y persistencia de Redis ante una caída abrupta.
 
 Se usa como **prueba de regresión**: después de cualquier cambio en el código o en la configuración, se corre el script y, si da `0 FAIL`, el sistema sigue funcionando como antes.
 
@@ -31,14 +31,14 @@ Unblock-File .\scripts\smoke-test.ps1          # si el archivo fue descargado
 
 ## Parámetros
 
-| Parámetro         | Tipo   | Default | Descripción                                                                                                                                                                                     |
-|-------------------|--------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `-Build`          | switch | —       | Ejecuta `docker compose down`, construye las 5 imágenes (`blockchain-api`, `coordinator`, `transaction-pool`, `worker`, `blockchain-frontend`) y levanta el stack con `docker compose up -d`.                                                         |
-| `-Clean`          | switch | —       | Solo tiene efecto junto con `-Build`: usa `docker compose down -v` para borrar los volúmenes y arrancar con la cadena vacía.                                                                    |
-| `-Persistence`    | switch | —       | Agrega el paso 6: mata Redis con SIGKILL y verifica que la cadena sobreviva.                                                                                                                    |
-| `-TxPerRound`     | int    | `5`     | Transacciones enviadas en cada ronda de minado.                                                                                                                                                 |
-| `-Rounds`         | int    | `2`     | Cantidad de rondas de minado (un bloque por ronda).                                                                                                                                             |
-| `-MineTimeoutSec` | int    | `180`   | Tiempo máximo de espera para que aparezca cada bloque nuevo.                                                                                                                                    |
+| Parámetro         | Tipo   | Default | Descripción                                                                                                                         |
+| ----------------- | ------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `-Build`          | switch | —       | Ejecuta `docker compose down`, construye las 5 imágenes (`blockchain-api`, `coordinator`, `transaction-pool`, `worker`, `blockchain-frontend`) y levanta el stack con `docker compose up -d`. |
+| `-Clean`          | switch | —       | Solo tiene efecto junto con `-Build`: usa `docker compose down -v` para borrar los volúmenes y arrancar con la cadena vacía.        |
+| `-Persistence`    | switch | —       | Agrega el paso 6: mata Redis con SIGKILL y verifica que la cadena sobreviva.                                                         |
+| `-TxPerRound`     | int    | `5`     | Transacciones enviadas en cada ronda de minado.                                                                                      |
+| `-Rounds`         | int    | `2`     | Cantidad de rondas de minado (un bloque por ronda).                                                                                  |
+| `-MineTimeoutSec` | int    | `180`   | Tiempo máximo de espera para que aparezca cada bloque nuevo.                                                                         |
 
 > **Importante:** si se modifica `docker-compose.yml` sin cambiar código, no hace falta `-Build`, pero el stack sí tiene que recrearse para tomar el cambio: `docker compose down -v; docker compose up -d` y después el script sin `-Build`.
 
@@ -62,6 +62,22 @@ Espera hasta 120 s a que respondan los endpoints de estado y luego verifica el r
 De RabbitMQ lista las colas con su cantidad de consumidores. La salida esperada es `mining.results` más dos colas anónimas `spring.gen-*` (una por worker), cada una con `1c`: confirma el esquema híbrido de colas y tópicos de P2.
 
 Si blockchain-api, coordinator o transaction-pool no responden, el script corta acá y sugiere revisar `docker compose logs`.
+
+### 1b. Proxy reverso de nginx
+
+El navegador solo habla con nginx en `http://localhost` (mismo origen); nginx reenvía cada ruta al servicio correspondiente. Este paso verifica el ruteo **pasando por el puerto 80**:
+
+| Ruta a través de nginx            | Destino            | Resultado esperado                                  |
+| --------------------------------- | ------------------ | --------------------------------------------------- |
+| `GET /api/chain/stats`            | blockchain-api     | 200                                                 |
+| `GET /api/pool/status`            | transaction-pool   | 200                                                 |
+| `POST /api/transactions` (A → A)  | blockchain-api     | 400 (llega al servicio y la validación responde)    |
+| `POST /api/events/block-mined`    | —                  | 404: endpoint interno del coordinator, bloqueado    |
+| `POST /api/pool/miners/keepalive` | —                  | 404: keep-alive interno de los mineros, bloqueado   |
+| `GET /ws/info`                    | blockchain-api     | JSON de SockJS con `websocket: true`                |
+| `ws://localhost/ws/websocket`     | blockchain-api     | WebSocket abierto y respuesta `CONNECTED` de STOMP  |
+
+La última prueba abre un **WebSocket real** con `System.Net.WebSockets.ClientWebSocket` y envía un frame STOMP `CONNECT`. Solo pasa si nginx reenvía correctamente las cabeceras `Upgrade` y `Connection`, que es el punto donde suelen fallar los proxys con WebSocket.
 
 ### 2. Bloque génesis e integridad inicial
 
@@ -185,6 +201,8 @@ docker exec blockchain-redis redis-cli -a redis123 CONFIG GET appendonly   # deb
 | "No se puede cargar el archivo... la ejecución de scripts está deshabilitada" | Política de ejecución de Windows | `Set-ExecutionPolicy -Scope Process Bypass` y `Unblock-File` |
 | El paso 6 da `3 -> 0` | AOF desactivado | Verificar `--appendonly yes` en `docker-compose.yml` con `docker compose config \| Select-String appendonly` y recrear el stack |
 | Un cambio en `docker-compose.yml` no se refleja | El stack no se recreó (`-Clean` sin `-Build` no hace nada) | `docker compose down -v; docker compose up -d` |
+| Falla `WebSocket + STOMP a traves de nginx` pero `/ws/info` responde | nginx no reenvía `Upgrade`/`Connection` | Revisar el bloque `location /ws` de `frontend/nginx.conf` y reconstruir la imagen del frontend |
+| El paso 1b da 404/502 en todas las rutas | La imagen del frontend es anterior al proxy | `.\scripts\smoke-test.ps1 -Build` |
 | Falla la verificación de RabbitMQ | Credenciales distintas de `admin:admin123` | Ajustar la línea de `$cred` en el script |
 
 ## Limitaciones

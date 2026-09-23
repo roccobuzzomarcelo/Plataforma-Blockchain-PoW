@@ -66,6 +66,26 @@ function Wait-Url($url, $name, $timeoutSec = 120) {
     Fail "$name no respondio en $timeoutSec s ($url)"; return $false
 }
 
+function Test-StompWebSocket($uri) {
+    # Abre un WebSocket real (exige que el proxy reenvie Upgrade/Connection),
+    # manda un frame STOMP CONNECT y devuelve la primera respuesta del broker.
+    $ws = New-Object System.Net.WebSockets.ClientWebSocket
+    $ct = [Threading.CancellationToken]::None
+    try {
+        if (-not $ws.ConnectAsync([Uri]$uri, $ct).Wait(5000)) { return 'timeout al conectar' }
+        $frame = "CONNECT`naccept-version:1.2`nhost:localhost`n`n" + [char]0
+        $out = [System.ArraySegment[byte]]::new([Text.Encoding]::UTF8.GetBytes($frame))
+        $ws.SendAsync($out, [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $ct).Wait(5000) | Out-Null
+        $buf = New-Object byte[] 2048
+        $task = $ws.ReceiveAsync([System.ArraySegment[byte]]::new($buf), $ct)
+        if (-not $task.Wait(5000)) { return 'sin respuesta STOMP' }
+        return [Text.Encoding]::UTF8.GetString($buf, 0, $task.Result.Count)
+    } catch {
+        $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }
+        return "error: $($e.Message)"
+    } finally { $ws.Dispose() }
+}
+
 function Get-Chain {
     $blocks = Get-Json "$API/api/chain/blocks"   # variable intermedia: en PS 5.1 el array JSON llega como un solo objeto
     ,@($blocks | Sort-Object { [int]$_.index })
@@ -124,6 +144,20 @@ try {
     Ok "RabbitMQ management OK ($(@($q).Count) colas: $((@($q) | ForEach-Object { "$($_.vhost)$($_.name)[$($_.consumers)c]" }) -join ', '))"
 } catch { Fail "RabbitMQ management API no responde: $($_.Exception.Message)" }
 if (-not $up) { Write-Host "`nServicios caidos, reviso logs con: docker compose logs --tail 50" -ForegroundColor Yellow; exit 1 }
+
+Step '1b. Proxy reverso de nginx (frontend en :80)'
+$WEB = 'http://localhost'
+try { Get-Json "$WEB/api/chain/stats" | Out-Null; Ok '/api/chain/* -> blockchain-api' } catch { Fail "/api/chain/stats via nginx: $($_.Exception.Message)" }
+try { Get-Json "$WEB/api/pool/status" | Out-Null; Ok '/api/pool/* -> transaction-pool' } catch { Fail "/api/pool/status via nginx: $($_.Exception.Message)" }
+Check ((Get-StatusCode "$WEB/api/transactions" @{ sender = 'A'; receiver = 'A'; amount = 10 }) -eq 400) '/api/transactions -> blockchain-api (validacion devuelve 400)'
+Check ((Get-StatusCode "$WEB/api/events/block-mined" @{}) -eq 404) '/api/events/* bloqueado (endpoint interno del coordinator)'
+Check ((Get-StatusCode "$WEB/api/pool/miners/keepalive" @{}) -eq 404) '/api/pool/miners/* bloqueado (keep-alive interno)'
+try {
+    $info = Get-Json "$WEB/ws/info"
+    Check ($info.websocket -eq $true) '/ws/info responde (endpoint SockJS de blockchain-api)'
+} catch { Fail "/ws/info via nginx: $($_.Exception.Message)" }
+$stomp = Test-StompWebSocket 'ws://localhost/ws/websocket'
+Check ($stomp -like 'CONNECTED*') "WebSocket + STOMP a traves de nginx ($(($stomp -split "`n")[0]))"
 
 Step '2. Bloque genesis e integridad inicial'
 $stats = Get-Json "$API/api/chain/stats"

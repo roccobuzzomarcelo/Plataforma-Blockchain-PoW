@@ -11,20 +11,22 @@ export function TransactionForm({ onSent }) {
         setLoading(true);
         setStatus(null);
         try {
-            const tx = {
-                id: `tx-${Date.now()}`,
-                sender: form.sender,
-                receiver: form.receiver,
+            // blockchain-api valida los datos, genera id/timestamp y reenvía al pool
+            const { data } = await api.sendTransaction({
+                sender: form.sender.trim(),
+                receiver: form.receiver.trim(),
                 amount: parseFloat(form.amount),
-                timestamp: new Date().toISOString(),
-                type: 'TRANSFER',
-            };
-            await api.sendTransaction(tx);
-            setStatus({ ok: true, msg: `Transacción enviada: ${tx.id}` });
+            });
+            setStatus({ ok: true, msg: data });
             setForm({ sender: '', receiver: '', amount: '' });
             onSent?.();
-        } catch {
-            setStatus({ ok: false, msg: 'Error al enviar la transacción' });
+        } catch (err) {
+            // En un 400, blockchain-api devuelve el motivo como texto plano
+            const detail = err.response?.data;
+            setStatus({
+                ok: false,
+                msg: typeof detail === 'string' && detail ? detail : 'Error al enviar la transacción',
+            });
         } finally {
             setLoading(false);
         }

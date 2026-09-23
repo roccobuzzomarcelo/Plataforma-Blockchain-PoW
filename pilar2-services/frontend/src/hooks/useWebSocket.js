@@ -8,7 +8,7 @@ export function useWebSocket(onBlockMined) {
 
     useEffect(() => {
         const client = new Client({
-            webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+            webSocketFactory: () => new SockJS('/ws'), // relativo: proxy de nginx (prod) o de Vite (dev)
             reconnectDelay: 3000,
             onConnect: () => {
                 setConnected(true);

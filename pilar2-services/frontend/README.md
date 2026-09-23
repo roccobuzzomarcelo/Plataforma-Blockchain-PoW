@@ -53,14 +53,21 @@ src/
 
 ## Conexión a servicios
 
-```javascript
-// blockchain-api (lectura + WebSocket)
-http://localhost:8080/api/chain/...
-ws://localhost:8080/ws
+El frontend usa **rutas relativas**: el navegador siempre habla con el mismo origen que sirvió la app, y un proxy reverso reenvía cada ruta al servicio que corresponde. Así no hay URLs de `localhost` fijas en el código, no se depende de CORS y el mismo build funciona en Docker Compose, minikube y GKE.
 
-// transaction-pool (escritura)
-http://localhost:8082/api/pool/...
-```
+| Ruta                     | Servicio destino        | Uso                                                        |
+| ------------------------ | ----------------------- | ---------------------------------------------------------- |
+| `/api/chain/*`           | `blockchain-api:8080`   | Bloques, estadísticas, transacciones pendientes            |
+| `/api/transactions`      | `blockchain-api:8080`   | Alta de transacciones (valida y reenvía al pool)           |
+| `/ws`                    | `blockchain-api:8080`   | WebSocket STOMP/SockJS (`/topic/blocks`)                   |
+| `/api/pool/*`            | `transaction-pool:8082` | Estado del pool y flush manual                             |
+| `/api/events/*`          | — (404)                 | Interno: coordinator → blockchain-api. No se expone        |
+| `/api/pool/miners/*`     | — (404)                 | Interno: keep-alive de mineros GPU. No se expone           |
+
+- **Producción** (imagen Docker): el proxy es nginx, configurado en `nginx.conf`. Los destinos son los nombres de servicio de Docker Compose, que coinciden con los nombres de los Services de Kubernetes.
+- **Desarrollo** (`npm run dev`): el proxy es el de Vite, configurado en `vite.config.js` con las mismas rutas, apuntando a `localhost:8080` y `localhost:8082`.
+
+Las transacciones se envían a `blockchain-api` (`POST /api/transactions` con `{ sender, receiver, amount }`) y no directamente al pool: `blockchain-api` valida los datos, genera el `id` y el `timestamp`, y reenvía al `transaction-pool`. Si la validación falla, el formulario muestra el motivo que devuelve el servicio.
 
 ## Estrategia de actualización
 
@@ -80,11 +87,18 @@ http://localhost:8082/api/pool/...
 ## Configuración Vite
 
 ```javascript
-// vite.config.js — necesario para que sockjs-client funcione en el browser
+// vite.config.js
 export default defineConfig({
   plugins: [react()],
   define: {
-    global: 'globalThis',
+    global: 'globalThis', // necesario para que sockjs-client funcione en el browser
+  },
+  server: {
+    proxy: {                                   // replica las rutas de nginx.conf
+      '/api/pool': 'http://localhost:8082',    // debe ir antes que '/api'
+      '/api': 'http://localhost:8080',
+      '/ws': { target: 'http://localhost:8080', ws: true },
+    },
   },
 })
 ```
@@ -101,12 +115,12 @@ npm run dev
 ```bash
 npm run build
 # Los archivos estáticos quedan en dist/
-# Servir con Nginx en Kubernetes (ver Pilar 3)
+# En la imagen Docker los sirve nginx, que además hace de proxy reverso (nginx.conf)
 ```
 
 ## Verificar
 
-Abrí `http://localhost:5173` y verificá:
+Abrí `http://localhost:5173` (desarrollo) o `http://localhost` (Docker Compose) y verificá:
 
 - La stats bar muestra bloques y hash
 - El indicador WebSocket muestra `● LIVE`

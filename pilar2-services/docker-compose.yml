@@ -146,6 +146,7 @@ services:
       - "80:80"
     depends_on:
       - blockchain-api
+      - transaction-pool
     networks:
       - blockchain-net
     restart: unless-stopped
