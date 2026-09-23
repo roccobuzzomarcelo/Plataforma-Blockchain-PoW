@@ -1,6 +1,7 @@
 # Blockchain API - Backend REST + WebSocket
 
 ## Descripción
+
 Servicio backend que expone la blockchain al frontend via REST y notifica
 cambios en tiempo real via WebSocket (STOMP). Lee el estado de la blockchain
 desde Redis y actúa como punto de entrada para nuevas transacciones.
@@ -12,6 +13,7 @@ y hace el broadcast a todos los clientes conectados.
 ## Endpoints REST
 
 ### Blockchain
+
 | Método | Endpoint                          | Descripción                   |
 | ------ | --------------------------------- | ----------------------------- |
 | GET    | `/api/chain/blocks`               | Todos los bloques confirmados |
@@ -21,11 +23,13 @@ y hace el broadcast a todos los clientes conectados.
 | GET    | `/api/chain/stats`                | Estadísticas generales        |
 
 ### Eventos (uso interno)
+
 | Método | Endpoint                  | Descripción                                                    |
 | ------ | ------------------------- | -------------------------------------------------------------- |
 | POST   | `/api/events/block-mined` | Recibe notificación del Coordinator y hace broadcast WebSocket |
 
 #### Body POST /api/events/block-mined
+
 ```json
 {
   "blockIndex": 1,
@@ -38,23 +42,28 @@ y hace el broadcast a todos los clientes conectados.
 ```
 
 ## WebSocket
+
 Endpoint: `ws://localhost:8080/ws` (con fallback SockJS)
 
 ### Tópicos disponibles
+
 | Tópico          | Descripción                                                   |
 | --------------- | ------------------------------------------------------------- |
 | `/topic/blocks` | Notificación cuando se mina un bloque nuevo (BlockMinedEvent) |
 
 ## Flujo de notificación en tiempo real
+
 ![Flujo de Notificación](../../docs/informe/assets/pilar2/flujo-blockchain-api.jpg)
 
 ## Dependencias principales
+
 - Spring Boot Web (REST)
 - Spring Boot WebSocket (STOMP + SockJS)
 - Spring Data Redis (RedisTemplate con GenericJackson2JsonRedisSerializer)
 - Módulo `shared`
 
 ## Configuración
+
 ```properties
 server.port=8080
 spring.data.redis.host=${REDIS_HOST:localhost}
@@ -64,18 +73,21 @@ services.transaction-pool.url=${TRANSACTION_POOL_URL:http://localhost:8082}
 ```
 
 ## Nota sobre deserialización Redis
+
 Usa `RedisTemplate<String, Object>` con `GenericJackson2JsonRedisSerializer`
 para leer los bloques guardados por el Coordinator. La deserialización se hace
 con `objectMapper.convertValue(raw, Block.class)` para manejar el caso en que
 Redis devuelva un `LinkedHashMap` en lugar del tipo concreto.
 
 ## Levantar
+
 ```bash
 mvn clean package -DskipTests
 java -jar target/blockchain-api-1.0.0-SNAPSHOT.jar
 ```
 
 ## Verificar
+
 ```bash
 curl http://localhost:8080/api/chain/stats
 curl http://localhost:8080/api/chain/blocks

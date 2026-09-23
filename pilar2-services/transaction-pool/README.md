@@ -1,6 +1,7 @@
 # Transaction Pool (TrP) - Pool de Transacciones
 
 ## Descripción
+
 Servicio que recibe transacciones individuales, las acumula en Redis
 y cada 60 segundos las agrupa en un bloque para enviarlo al Coordinator.
 También gestiona la disponibilidad de miners GPU y ajusta la dificultad
@@ -11,15 +12,19 @@ dinámicamente según los recursos disponibles.
 ## Responsabilidades
 
 ### 1. Recepción de transacciones
+
 Recibe transacciones via REST y las almacena en Redis como pendientes.
 
 ### 2. Agrupación en bloques (scheduler cada 60 segundos)
+
 Toma todas las transacciones pendientes, las agrupa y envía al Coordinator
 via `POST /api/coordinator/mine-block`. El Coordinator es quien determina
 el índice y hash del bloque anterior leyendo Redis directamente.
 
 ### 3. Ajuste dinámico de dificultad
+
 Antes de enviar el bloque al Coordinator, consulta si hay miners GPU activos:
+
 - Con GPU disponibles → usa el prefijo configurado (ej: `000`)
 - Sin GPU disponibles → reduce el prefijo en un carácter (ej: `000` → `00`)
 
@@ -27,12 +32,14 @@ Esto garantiza que la red siga funcionando aunque sea más "fácil" cuando
 solo hay miners CPU disponibles.
 
 ### 4. Gestión de miners GPU (keep-alive)
+
 Recibe señales de vida de los miners GPU cada N segundos.
 Un miner GPU se considera inactivo si no envía keep-alive en los últimos
 30 segundos. La cantidad de miners activos determina el `workerCount`
 enviado al Coordinator para calcular el rango de búsqueda del nonce.
 
 ## Endpoints REST
+
 | Método | Endpoint                     | Descripción                                                |
 | ------ | ---------------------------- | ---------------------------------------------------------- |
 | POST   | `/api/pool/transactions`     | Recibe nueva transacción                                   |
@@ -41,7 +48,8 @@ enviado al Coordinator para calcular el rango de búsqueda del nonce.
 | GET    | `/api/pool/status`           | Estado del pool (cantidad de tx pendientes)                |
 | POST   | `/api/pool/miners/keepalive` | Keep-alive de miner GPU                                    |
 
-#### Body POST /api/pool/transactions
+### Body POST /api/pool/transactions
+
 ```json
 {
   "id": "tx-001",
@@ -54,9 +62,11 @@ enviado al Coordinator para calcular el rango de búsqueda del nonce.
 ```
 
 ## Flujo de procesamiento
+
 ![Flujo de TX-Pool](../../docs/informe/assets/pilar2/flujo-tx-pool.jpg)
 
 ## Configuración
+
 ```properties
 server.port=8082
 spring.data.redis.host=${REDIS_HOST:localhost}
@@ -68,12 +78,14 @@ services.coordinator.url=${COORDINATOR_URL:http://localhost:8081}
 ```
 
 ## Levantar
+
 ```bash
 mvn clean package -DskipTests
 java -jar target/transaction-pool-1.0.0-SNAPSHOT.jar
 ```
 
 ## Verificar
+
 ```bash
 # Ver transacciones pendientes
 curl http://localhost:8082/api/pool/transactions

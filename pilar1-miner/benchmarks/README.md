@@ -1,6 +1,7 @@
 # Batería de Tests Comparativos GPU vs CPU
 
 ## Objetivo
+
 Comparar el rendimiento del minero GPU (CUDA) contra el minero CPU
 (Java 21 con ExecutorService) ejecutando los mismos casos de prueba
 y analizando las diferencias en tiempo de ejecución.
@@ -8,12 +9,14 @@ y analizando las diferencias en tiempo de ejecución.
 ## Entornos utilizados
 
 ### CPU
+
 - Lenguaje: Java 21
 - Paralelismo: ExecutorService con 8 hilos (núcleos disponibles)
 - Sistema operativo: Windows
 - Implementación: CpuMiner.java
 
 ### GPU
+
 - Lenguaje: CUDA C++
 - Plataforma: godbolt.org (hardware NVIDIA real, sm_75)
 - Paralelismo: 256 bloques x 256 hilos = 65.536 nonces por batch
@@ -50,8 +53,8 @@ tres cadenas distintas con prefijos de longitud 1 a 5 caracteres.
 
 ### CPU (Java 21 - 8 hilos)
 
-| # | Cadena       | Prefijo   | Nonce         | MD5 resultante                     | Tiempo    |
-|---|--------------|-----------|---------------|------------------------------------|-----------|
+| #  | Cadena       | Prefijo  | Nonce         | MD5 resultante                     | Tiempo    |
+|----|--------------|----------|---------------|------------------------------------|-----------|
 | 1  | `blockchain` | `0`      | 1.610.612.737 | `02b8746990e8608fb1cbb4d2fabfefbb` | 0.047 seg |
 | 2  | `blockchain` | `00`     | 805.306.450   | `0006a517b9d90bf8985e45001c48d85c` | 0.079 seg |
 | 3  | `blockchain` | `000`    | 268.435.526   | `0002235ff73ef0278691fb9e73dec8c2` | 0.075 seg |
@@ -111,6 +114,7 @@ tres cadenas distintas con prefijos de longitud 1 a 5 caracteres.
 ## Análisis
 
 ### Los nonces son diferentes entre CPU y GPU
+
 Esto es comportamiento esperado. Ambos mineros buscan en paralelo
 y el primero en encontrar cualquier nonce válido lo reporta. No
 existe un único nonce correcto, hay infinitos nonces que cumplen
@@ -118,6 +122,7 @@ el prefijo buscado. Lo importante es que todos los hashes
 encontrados son válidos y cumplen el prefijo requerido.
 
 ### La GPU es entre 100x y 3758x más rápida
+
 La ventaja de la GPU crece con la longitud del prefijo. Para
 prefijos cortos (1-2 caracteres) la solución aparece en el primer
 batch tanto en GPU como en CPU, por lo que la diferencia es menor.
@@ -126,12 +131,14 @@ paralelismo masivo de la GPU (65.536 nonces por batch simultáneos)
 marca una diferencia cada vez mayor.
 
 ### Los tiempos de GPU son casi constantes para prefijos cortos
+
 Para prefijos de 1 a 3 caracteres el tiempo GPU ronda los 0.0004
 segundos porque todo cabe en un único batch de 65.536 nonces. La
 diferencia aparece a partir de prefijo 4-5 donde se necesitan
 múltiples batches.
 
 ### Los tiempos de CPU son variables
+
 Con 8 hilos dividiendo el espacio en chunks, el tiempo depende
 de en qué chunk se encuentra la solución. Si la solución está al
 inicio del chunk de un hilo, termina rápido. Si está al final,
@@ -139,6 +146,7 @@ tarda más. Esto explica la variabilidad observada entre casos con
 diferente longitud de prefijo.
 
 ### Relevancia para el proyecto
+
 Esta comparativa justifica la decisión arquitectural del Pilar 2:
 usar GPU para el minado PoW siempre que esté disponible, y caer
 en mineros CPU solo cuando no haya GPUs en la red. El Nodo
@@ -146,6 +154,7 @@ Coordinador (NCT) ajustará la dificultad (longitud del prefijo)
 dinámicamente según los recursos disponibles.
 
 ## Conclusión
+
 La GPU supera ampliamente a la CPU en tareas de minería PoW,
 especialmente a medida que aumenta la dificultad. Para prefijos
 largos (5+ caracteres), la diferencia supera las 2000x, lo que

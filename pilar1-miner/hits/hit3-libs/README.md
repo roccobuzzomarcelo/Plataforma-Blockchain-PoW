@@ -1,33 +1,41 @@
 # Hit #3 - Librerías CUDA
 
 ## ¿Qué es CCCL?
+
 CUDA C++ Core Libraries (nvidia/cccl) es un conjunto de librerías
 de C++ para programación en GPU que agrupa tres componentes:
+
 - **Thrust**: algoritmos paralelos de alto nivel (sort, reduce, etc.)
 - **CUB**: primitivas de bajo nivel optimizadas para GPU
 - **libcu++**: implementación de la STL de C++ para GPU
 
 ## ¿Qué es Thrust?
+
 Thrust es la librería de alto nivel dentro de CCCL que permite
 escribir código paralelo para GPU de forma similar a la STL de
 C++, sin necesidad de escribir kernels manualmente.
 
 ## ¿Thrust necesita instalación adicional?
+
 No. Thrust ya viene incluido con CUDA. Verificado con:
+
 ```bash
 ls /usr/local/cuda/include/thrust/
 ```
+
 El comando lista todos los headers disponibles, confirmando que
 Thrust está preinstalado junto con CUDA 10.1 en el contenedor.
 
 ## Código ejecutado
 
 ### thrust_host_only.cu (GPGPU-Sim)
+
 Demuestra `thrust::sort` y `thrust::reduce` sobre `host_vector`
 sin necesidad de GPU real.
 Ver archivo: `thrust_host_only.cu`
 
 ### thrust_vectors.cu (godbolt.org)
+
 Demuestra transferencia CPU → GPU → CPU con `device_vector`
 sobre hardware NVIDIA real.
 Ver archivo: `thrust_vectors.cu`
@@ -35,6 +43,7 @@ Ver archivo: `thrust_vectors.cu`
 ## Resultados
 
 ### Ejemplo host (GPGPU-Sim)
+
 `thrust::sort` y `thrust::reduce` funcionaron correctamente sobre
 `host_vector` sin necesidad de GPU real.
 
@@ -55,6 +64,7 @@ Suma total con thrust::reduce: 150
 ```
 
 ### Ejemplo device_vector (godbolt.org, sm_75, hardware NVIDIA real)
+
 La transferencia CPU → GPU → CPU con `device_vector` funcionó
 correctamente en hardware NVIDIA real.
 
@@ -76,6 +86,7 @@ Thrust device_vector funciona correctamente!
 ```
 
 ## Limitación encontrada
+
 La transferencia con `thrust::device_vector` produce Segmentation
 Fault en GPGPU-Sim 4.0.0 debido a soporte incompleto de las
 operaciones de memoria de Thrust en el simulador.
@@ -101,6 +112,7 @@ correctamente (verificado en Hit #2).
 | Caso de uso ideal  | Algoritmos específicos      | Operaciones estándar          |
 
 ## Conclusión
+
 Para el minero PoW del proyecto se usará CUDA puro ya que la
 búsqueda del nonce por fuerza bruta requiere control total de
 hilos y rangos. Thrust sería útil para ordenar o reducir

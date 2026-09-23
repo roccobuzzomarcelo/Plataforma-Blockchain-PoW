@@ -1,6 +1,7 @@
 # Pilar 2 - Infraestructura de Servicios Distribuidos
 
 ## Descripción
+
 Implementación de una blockchain distribuida con Proof of Work (PoW)
 usando una arquitectura de microservicios. Cada servicio es independiente
 y se comunica de forma asincrónica a través de RabbitMQ y Redis.
@@ -18,6 +19,7 @@ y se comunica de forma asincrónica a través de RabbitMQ y Redis.
 | Redis              | 6379   | Base de datos blockchain         |
 
 ## Arquitectura
+
 ![Arquitectura](../docs/informe/assets/pilar2/arquitectura.jpg)
 
 ## Stack tecnológico
@@ -46,8 +48,10 @@ cd frontend           && npm install && npm run dev
 ```
 
 ## Módulo shared
+
 Contiene los modelos y utilidades compartidas entre todos los servicios.
 Debe publicarse en Maven local antes de compilar cualquier servicio:
+
 ```bash
 cd shared && mvn clean install
 ```

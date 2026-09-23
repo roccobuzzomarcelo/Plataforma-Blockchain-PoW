@@ -1,18 +1,22 @@
 # Hit #6 - Longitudes de prefijo en CUDA HASH
 
 ## Objetivo
+
 Analizar la relación entre la longitud del prefijo buscado y el
 tiempo requerido para encontrar el nonce correspondiente, usando
 el programa de fuerza bruta del Hit #5.
 
 ## Metodología
+
 Se ejecutó el programa `prefix_test.cu` con la cadena "blockchain"
 y prefijos de longitud creciente (1 a 6 caracteres), midiendo:
+
 - Nonce encontrado
 - Tiempo de ejecución
 - Cantidad de batches necesarios
 
 Las pruebas se realizaron en dos entornos:
+
 - **GPGPU-Sim**: simulador dentro del contenedor Docker
 - **godbolt.org** (sm_75): hardware NVIDIA real, para prefijos
   donde el simulador resultó inviable
@@ -40,11 +44,12 @@ nvcc --cudart shared prefix_test.cu -o prefix_test
 ## Análisis
 
 ### Relación longitud de prefijo vs intentos promedio
+
 Cada carácter del prefijo pertenece al alfabeto hexadecimal (16
 símbolos posibles: 0-9 y a-f). Por lo tanto, la probabilidad de
 que una posición coincida es 1/16. Para un prefijo de longitud N:
 
-```
+```bash
 Intentos promedio = 16^N
 Prefijo 1 → 16^1  =         16 intentos
 Prefijo 2 → 16^2  =        256 intentos
@@ -53,12 +58,14 @@ Prefijo 4 → 16^4  =     65.536 intentos
 Prefijo 5 → 16^5  =  1.048.576 intentos
 Prefijo 6 → 16^6  = 16.777.216 intentos
 ```
+
 Esto confirma que la dificultad crece de forma **exponencial**
 con la longitud del prefijo, lo cual es exactamente el principio
 detrás del algoritmo Proof of Work (PoW) en blockchain: aumentar
 un carácter del prefijo multiplica por 16 el trabajo requerido.
 
 ### Comparativa simulador vs hardware real
+
 El tiempo en GPGPU-Sim no refleja el rendimiento real de una GPU
 ya que el simulador ejecuta cada instrucción secuencialmente para
 emular el comportamiento paralelo. Esto se evidencia claramente
@@ -72,12 +79,14 @@ La diferencia es de varios órdenes de magnitud. En hardware real,
 en milisegundos.
 
 ### Prefijo más largo encontrado
+
 El prefijo más largo encontrado fue de **6 caracteres** (`000000`),
 con nonce 18.000.230, verificado en godbolt.org con hardware NVIDIA
 real. En el simulador no fue posible completar la búsqueda en un
 tiempo razonable.
 
 ## Conclusión
+
 La longitud del prefijo es el principal parámetro de dificultad
 del algoritmo PoW. En la blockchain real de Bitcoin, el prefijo
 equivalente tiene decenas de ceros, lo que requiere hardware
@@ -88,5 +97,6 @@ responsable de ajustar dinámicamente la longitud del prefijo según
 la capacidad de procesamiento disponible en la red de miners.
 
 ## Entorno
+
 - Contenedor: srirajpaul/gpgpu-sim:0.2 (GPGPU-Sim 4.0.0, sm_30)
 - godbolt.org: nvcc, sm_75, hardware NVIDIA real

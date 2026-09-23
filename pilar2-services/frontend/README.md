@@ -1,6 +1,7 @@
 # Frontend - Interfaz React
 
 ## Descripción
+
 Interfaz web desarrollada en React + Vite que permite visualizar el estado
 de la blockchain en tiempo real y enviar nuevas transacciones.
 Se comunica con `blockchain-api` via REST para operaciones puntuales
@@ -11,24 +12,29 @@ y via WebSocket (STOMP + SockJS) para actualizaciones en tiempo real.
 ## Funcionalidades
 
 ### Visualización
+
 - Lista de bloques confirmados ordenados del más reciente al más antiguo
 - Detalle expandible de cada bloque: hash, previousHash, nonce, timestamp y transacciones
 - Estadísticas generales en tiempo real: total de bloques, último bloque, hash, tx pendientes
 - Indicador de estado WebSocket (LIVE / OFF)
 
 ### Interacción
+
 - Formulario para enviar transacciones (sender, receiver, amount) al Transaction Pool
 - Botón para forzar el minado inmediato sin esperar el scheduler de 60 segundos
 - Log de eventos en tiempo real: cada bloque minado aparece con worker ganador, nonce y recompensa
 
 ### Tiempo real
+
 Cuando el Coordinator confirma un bloque nuevo:
+
 1. Notifica a `blockchain-api` via REST
 2. `blockchain-api` hace broadcast via WebSocket
 3. El frontend recibe el evento y actualiza la UI sin recargar la página
 4. El nuevo bloque se resalta visualmente durante 3 segundos
 
 ## Estructura
+
 ```bash
 src/
 ├── App.jsx                     # Componente raíz, maneja estado global y polling
@@ -46,6 +52,7 @@ src/
 ```
 
 ## Conexión a servicios
+
 ```javascript
 // blockchain-api (lectura + WebSocket)
 http://localhost:8080/api/chain/...
@@ -56,10 +63,12 @@ http://localhost:8082/api/pool/...
 ```
 
 ## Estrategia de actualización
+
 - WebSocket: actualización instantánea al recibir `BlockMinedEvent` en `/topic/blocks`
 - Polling: fallback cada 10 segundos para mantener sincronía si el WebSocket falla
 
 ## Dependencias principales
+
 ```json
 {
   "axios": "REST calls",
@@ -69,6 +78,7 @@ http://localhost:8082/api/pool/...
 ```
 
 ## Configuración Vite
+
 ```javascript
 // vite.config.js — necesario para que sockjs-client funcione en el browser
 export default defineConfig({
@@ -80,12 +90,14 @@ export default defineConfig({
 ```
 
 ## Levantar
+
 ```bash
 npm install
 npm run dev
 ```
 
 ## Build para producción
+
 ```bash
 npm run build
 # Los archivos estáticos quedan en dist/
@@ -93,7 +105,9 @@ npm run build
 ```
 
 ## Verificar
+
 Abrí `http://localhost:5173` y verificá:
+
 - La stats bar muestra bloques y hash
 - El indicador WebSocket muestra `● LIVE`
 - Los bloques aparecen en la lista
