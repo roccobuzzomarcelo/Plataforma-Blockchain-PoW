@@ -11,6 +11,11 @@ resource "google_compute_subnetwork" "blockchain_subnet" {
   region        = var.region
   network       = google_compute_network.blockchain_vpc.id
 
+  # Permite que VMs SIN IP pública (las mineras externas) lleguen a las
+  # APIs de Google -Artifact Registry, en este caso- por la red privada
+  # de Google, sin salir a Internet ni necesitar un Cloud NAT.
+  private_ip_google_access = true
+
   secondary_ip_range {
     range_name    = "pods"
     ip_cidr_range = "10.1.0.0/16"
@@ -94,7 +99,7 @@ resource "google_container_node_pool" "apps_pool" {
   }
 
   autoscaling {
-    min_node_count = 1
+    min_node_count = 2
     max_node_count = 4
   }
 }
