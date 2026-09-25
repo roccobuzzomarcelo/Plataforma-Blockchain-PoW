@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: blockchain-apps
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      nodeSelector:
+        pool: apps
+      containers:
+        - name: frontend
+          image: us-central1-docker.pkg.dev/sdypp-rocco/blockchain-repo/blockchain-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          # nginx.conf ya hace de reverse proxy hacia blockchain-api y
+          # transaction-pool por su nombre de Service -sin variables de
+          # entorno, es la misma imagen que corre en docker-compose.
+          readinessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+# ClusterIP a propósito, no LoadBalancer: la demo se hace por
+# port-forward (gratis, sin dejar un balanceador público facturando de
+# más). Ver README para el comando exacto.
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: blockchain-apps
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80

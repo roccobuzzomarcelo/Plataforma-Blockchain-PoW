@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: blockchain-apps
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      nodeSelector:
+        pool: apps
+      containers:
+        - name: worker
+          image: us-central1-docker.pkg.dev/sdypp-rocco/blockchain-repo/worker:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8083
+          env:
+            - name: RABBITMQ_HOST
+              value: "rabbitmq.blockchain-infra.svc.cluster.local"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_PASS
+            # Cada pod toma su propio nombre (único por replica) como
+            # WORKER_ID vía Downward API. Evita que las 2 réplicas
+            # compartan el mismo id en los logs y en el frontend.
+            - name: WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: WORKER_THREADS
+              value: "8"
+          readinessProbe:
+            tcpSocket:
+              port: 8083
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8083
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            # El minado usa 8 hilos de CPU en ráfagas cortas; el límite
+            # queda más alto que en los demás servicios para no
+            # estrangular esos picos.
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker
+  namespace: blockchain-apps
+spec:
+  selector:
+    app: worker
+  ports:
+    - port: 8083
+      targetPort: 8083

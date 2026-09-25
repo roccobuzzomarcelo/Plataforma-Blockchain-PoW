@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transaction-pool
+  namespace: blockchain-apps
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: transaction-pool
+  template:
+    metadata:
+      labels:
+        app: transaction-pool
+    spec:
+      nodeSelector:
+        pool: apps
+      containers:
+        - name: transaction-pool
+          image: us-central1-docker.pkg.dev/sdypp-rocco/blockchain-repo/transaction-pool:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8082
+          env:
+            - name: REDIS_HOST
+              value: "redis.blockchain-infra.svc.cluster.local"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: REDIS_PASS
+            - name: RABBITMQ_HOST
+              value: "rabbitmq.blockchain-infra.svc.cluster.local"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_PASS
+            # application.properties de este servicio defaultea a
+            # "blockchain" (a diferencia de coordinator/worker, que
+            # usan "/"). Se fija acá para no depender de crear ese
+            # vhost a mano en RabbitMQ (ver technical-learnings).
+            - name: RABBITMQ_VHOST
+              value: "/"
+            - name: COORDINATOR_URL
+              value: "http://coordinator:8081"
+          readinessProbe:
+            tcpSocket:
+              port: 8082
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transaction-pool
+  namespace: blockchain-apps
+spec:
+  selector:
+    app: transaction-pool
+  ports:
+    - port: 8082
+      targetPort: 8082

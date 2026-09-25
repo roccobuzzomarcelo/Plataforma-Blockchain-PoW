@@ -1,0 +1,90 @@
+# Redis con persistencia AOF (ver README del smoke-test: sin AOF, una
+# caída de pod pierde toda la cadena). StatefulSet + PVC porque necesita
+# el mismo volumen si el pod se reprograma. 1 réplica: el objetivo acá
+# es sobrevivir a un reinicio de pod, no un cluster de Redis en sí.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: blockchain-infra
+spec:
+  serviceName: redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      # infra-pool tiene el taint pool=infra:NoSchedule (ver main.tf);
+      # esta tolerance + nodeSelector es lo que le permite aterrizar ahí
+      # y en ningún otro lado.
+      tolerations:
+        - key: "pool"
+          operator: "Equal"
+          value: "infra"
+          effect: "NoSchedule"
+      nodeSelector:
+        pool: infra
+      containers:
+        - name: redis
+          image: redis:8-alpine
+          command:
+            - redis-server
+            - "--requirepass"
+            - "$(REDIS_PASS)"
+            - "--appendonly"
+            - "yes"
+          ports:
+            - containerPort: 6379
+          env:
+            - name: REDIS_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: REDIS_PASS
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+---
+# Headless: es lo que espera un StatefulSet para darle identidad de red
+# estable al pod (redis-0.redis.blockchain-infra.svc.cluster.local).
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: blockchain-infra
+spec:
+  clusterIP: None
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379

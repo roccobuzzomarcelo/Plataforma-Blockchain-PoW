@@ -1,0 +1,109 @@
+# RabbitMQ con persistencia (PVC) para no perder las colas si el pod se
+# reinicia. Un solo Service cumple DOS roles a la vez:
+#  1) da DNS normal dentro del clúster (rabbitmq.blockchain-infra.svc.cluster.local)
+#     para blockchain-api, coordinator, transaction-pool y los workers en pods.
+#  2) con el annotation de "Internal" y una IP fija (10.0.0.100, la misma
+#     que reservamos en variables.tf), lo hace alcanzable por CUALQUIER VM
+#     de la VPC -las mineras externas del Pilar 3.1- que no forma parte
+#     del clúster y no puede resolver DNS interno de Kubernetes.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  namespace: blockchain-infra
+spec:
+  serviceName: rabbitmq
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      tolerations:
+        - key: "pool"
+          operator: "Equal"
+          value: "infra"
+          effect: "NoSchedule"
+      nodeSelector:
+        pool: infra
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:4.1-management
+          ports:
+            - containerPort: 5672
+              name: amqp
+            - containerPort: 15672
+              name: management
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-secret
+                  key: RABBITMQ_PASS
+          volumeMounts:
+            - name: rabbitmq-data
+              mountPath: /var/lib/rabbitmq
+          readinessProbe:
+            # timeoutSeconds explícito: rabbitmq-diagnostics levanta un
+            # nodo Erlang efímero para consultar al principal, y con el
+            # default de Kubernetes (1s) casi siempre da timeout aunque
+            # el servidor esté sano -eso fue lo que causó el
+            # CrashLoopBackOff la primera vez.
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 512Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: rabbitmq-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: blockchain-infra
+  annotations:
+    # GKE: crea un Internal TCP Load Balancer en vez de uno público.
+    # Sigue viviendo 100% dentro de la VPC, nada expuesto a Internet.
+    networking.gke.io/load-balancer-type: "Internal"
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 10.0.0.100
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672

@@ -1,0 +1,11 @@
+# Dos namespaces, como pide 3.1: uno para los servicios de infraestructura
+# (Redis, RabbitMQ) y otro compartido para las aplicaciones del sistema.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: blockchain-infra
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: blockchain-apps
