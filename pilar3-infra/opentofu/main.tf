@@ -97,9 +97,13 @@ resource "google_container_node_pool" "apps_pool" {
       pool = "apps"
     }
   }
-
+  
   autoscaling {
     min_node_count = 2
-    max_node_count = 4
+    max_node_count = 6
+  }
+
+  lifecycle {
+    ignore_changes = [node_count]
   }
 }

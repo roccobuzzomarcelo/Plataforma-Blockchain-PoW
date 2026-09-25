@@ -47,6 +47,8 @@ spec:
                   key: RABBITMQ_PASS
             - name: MINING_PREFIX
               value: "000"
+            - name: MINING_CHUNK_COUNT
+              value: "2"
             - name: BLOCKCHAIN_API_URL
               value: "http://blockchain-api:8080"
           readinessProbe:
