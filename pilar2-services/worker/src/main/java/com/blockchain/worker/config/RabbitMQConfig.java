@@ -17,6 +17,7 @@ public class RabbitMQConfig {
 
     // Debe coincidir exactamente con el coordinator
     public static final String MINING_EXCHANGE = "mining.tasks.exchange";
+    public static final String TASKS_QUEUE = "mining.tasks";
     public static final String RESULTS_EXCHANGE = "mining.results.exchange";
     public static final String RESULTS_QUEUE = "mining.results";
 
@@ -28,24 +29,24 @@ public class RabbitMQConfig {
         return mapper;
     }
 
-    // Queue exclusiva por worker: se crea y destruye con la conexión
-    @Bean
-    public Queue miningQueue() {
-        return QueueBuilder.nonDurable()
-                .exclusive()
-                .autoDelete()
-                .build();
-    }
-
     @Bean
     public FanoutExchange miningExchange() {
         return new FanoutExchange(MINING_EXCHANGE, true, false);
     }
 
-    // Cada worker se vincula a su propia queue exclusiva en el fanout
+    // Cola COMPARTIDA entre todas las réplicas de worker (antes era una
+    // cola exclusiva y autoDelete por worker, así que cada uno recibía
+    // copia de TODA tarea -broadcast, no distribución de trabajo real).
+    // Con una sola cola durable y varios consumidores, RabbitMQ reparte
+    // cada mensaje a un único consumidor libre.
     @Bean
-    public Binding miningBinding(Queue miningQueue, FanoutExchange miningExchange) {
-        return BindingBuilder.bind(miningQueue).to(miningExchange);
+    public Queue tasksQueue() {
+        return QueueBuilder.durable(TASKS_QUEUE).build();
+    }
+
+    @Bean
+    public Binding miningBinding(Queue tasksQueue, FanoutExchange miningExchange) {
+        return BindingBuilder.bind(tasksQueue).to(miningExchange);
     }
 
     @Bean
@@ -73,6 +74,11 @@ public class RabbitMQConfig {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(converter);
+        // Clave para que la distribución de chunks sea pareja: sin esto,
+        // RabbitMQ puede entregarle varios mensajes sin ACK al mismo
+        // consumidor mientras está ocupado minando el primero, dejando a
+        // otros workers ociosos con la cola vacía.
+        factory.setPrefetchCount(1);
         return factory;
     }
 }

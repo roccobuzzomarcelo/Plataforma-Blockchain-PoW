@@ -2,6 +2,7 @@ package com.blockchain.worker.messaging;
 
 import com.blockchain.shared.event.MiningResultEvent;
 import com.blockchain.shared.model.MiningTask;
+import com.blockchain.worker.config.RabbitMQConfig;
 import com.blockchain.worker.miner.PoWMiner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,8 +14,10 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Recibe tareas de minería del exchange fanout.
- * Por cada tarea, lanza el PoWMiner y publica el resultado.
+ * Recibe chunks de la cola compartida de tareas (competencia entre
+ * todas las réplicas de worker: cada mensaje lo procesa UNA sola,
+ * la que esté libre en ese momento -ver RabbitMQConfig, prefetch=1).
+ * Por cada chunk, lanza el PoWMiner y publica el resultado.
  */
 @Component
 public class TaskConsumer {
@@ -36,7 +39,7 @@ public class TaskConsumer {
         this.workerId = workerId;
     }
 
-    @RabbitListener(queues = "#{miningQueue.name}")
+    @RabbitListener(queues = RabbitMQConfig.TASKS_QUEUE)
     public void onTask(MiningTask task) {
         log.info("Tarea recibida: block={}, prefix={}, range=[{},{}]",
                 task.blockIndex(), task.prefix(), task.rangeMin(), task.rangeMax());

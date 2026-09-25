@@ -29,6 +29,13 @@ import java.time.Instant;
  * rompía esto: la réplica que recibía el resultado ganador no encontraba
  * la tarea y el bloque nunca se confirmaba. Por eso el estado de
  * consenso vive en Redis, visible para cualquier réplica.
+ *
+ * Además, desde que un bloque se divide en varios chunks de rango de
+ * nonce (ver BlockService.buildMiningTasks), el CAS de "quién gana"
+ * está indexado por blockIndex y no por taskId: dos chunks del mismo
+ * bloque podrían resolver casi al mismo tiempo, y sin esto ambos
+ * intentarían confirmar el mismo índice -BlockService.confirmBlock no
+ * es idempotente, un segundo confirm pisaría al primero en silencio.
  */
 @Service
 public class ConsensusService {
@@ -72,13 +79,19 @@ public class ConsensusService {
             return;
         }
 
-        String resolvedKey = RESOLVED_KEY_PREFIX + result.taskId();
-        // CAS distribuido: SET NX. Cualquier réplica que llegue primero gana;
-        // el resto descarta el resultado como tardío/duplicado.
+        // CAS distribuido a nivel de BLOQUE, no de chunk: con varios
+        // chunks por bloque, más de uno podría encontrar un nonce
+        // válido casi al mismo tiempo (más probable cuanto más fácil
+        // el prefijo). Indexar el CAS por blockIndex asegura que solo
+        // el primer chunk en llegar -sea cual sea- confirma el bloque;
+        // el resto se descarta aunque también sea una solución válida.
+        String resolvedKey = RESOLVED_KEY_PREFIX + "block:" + result.blockIndex();
+        // SET NX: cualquier réplica que llegue primero gana; el resto
+        // descarta el resultado como tardío/duplicado.
         Boolean wonRace = redis.opsForValue().setIfAbsent(resolvedKey, result.workerId(), TASK_TTL);
         if (!Boolean.TRUE.equals(wonRace)) {
-            log.debug("Resultado tardío descartado de worker {} para tarea {}",
-                    result.workerId(), result.taskId());
+            log.debug("Resultado descartado de worker {} para bloque {} (otro chunk ya lo resolvió)",
+                    result.workerId(), result.blockIndex());
             return;
         }
 

@@ -32,6 +32,14 @@ public class BlockService {
     @Value("${mining.range-size:10000000}")
     private long rangeSize;
 
+    // Cuántos pedazos se divide el espacio de búsqueda por bloque.
+    // Independiente de cuántos workers hay realmente conectados -eso lo
+    // resuelve RabbitMQ solo, repartiendo la cola entre quien esté
+    // libre-. Es el parámetro que varía la sección 3.3 ("tamaños de
+    // fragmentación del pool de transacciones").
+    @Value("${mining.chunk-count:4}")
+    private int chunkCount;
+
     public BlockService(RedisTemplate<String, Object> redis, ObjectMapper objectMapper) {
         this.redis = redis;
         this.objectMapper = objectMapper;
@@ -58,17 +66,31 @@ public class BlockService {
         return objectMapper.convertValue(raw, Block.class);
     }
 
-    /** Construye la MiningTask para el siguiente bloque. */
-    public MiningTask buildMiningTask(List<Transaction> transactions, String prefix, int workerCount) {
+    /**
+     * Construye los chunks de MiningTask para el siguiente bloque:
+     * divide [0, rangeSize) en {@code chunkCount} rangos disjuntos,
+     * cada uno con su propio taskId, pero mismo blockIndex/str/
+     * bcContent/prefix/previousHash -eso es lo que hace que cualquiera
+     * de los chunks, al resolverse, sea una solución válida para EL
+     * MISMO bloque.
+     */
+    public List<MiningTask> buildMiningTasks(List<Transaction> transactions, String prefix) {
         Block latest = getLatestBlock();
         int nextIndex = (latest == null) ? 1 : latest.index() + 1;
         String previousHash = (latest == null) ? "0".repeat(32) : latest.blockHash();
 
         String effectivePrefix = (prefix != null && !prefix.isBlank()) ? prefix : defaultPrefix;
-        long rangeMax = (long) workerCount * rangeSize;
+        int chunks = Math.max(1, chunkCount);
+        long chunkSize = rangeSize / chunks;
 
-        return MiningTask.of(nextIndex, previousHash, transactions,
-                effectivePrefix, 0L, rangeMax);
+        List<MiningTask> tasks = new ArrayList<>();
+        long start = 0;
+        for (int i = 0; i < chunks; i++) {
+            long end = (i == chunks - 1) ? chunks * chunkSize : start + chunkSize;
+            tasks.add(MiningTask.of(nextIndex, previousHash, transactions, effectivePrefix, start, end));
+            start = end;
+        }
+        return tasks;
     }
 
     /** Confirma un bloque resuelto. */

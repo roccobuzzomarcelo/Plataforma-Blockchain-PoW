@@ -34,27 +34,31 @@ public class CoordinatorController {
 
     /**
      * Recibe un bloque formado del Transaction Pool (NCT.1).
-     * Body: { "transactions": [...], "prefix": "000", "workerCount": 2 }
+     * Body: { "transactions": [...], "prefix": "000" }
+     * (el campo "workerCount" que aún puede mandar transaction-pool se
+     * ignora: la cantidad de chunks ahora es mining.chunk-count, del
+     * lado del coordinator -no depende de mineros GPU conectados-.)
      */
     @PostMapping("/mine-block")
     public ResponseEntity<Map<String, Object>> mineBlock(@RequestBody MineBlockRequest req) {
         log.info("Solicitud de minería recibida: {} txs, prefix={}",
                 req.transactions().size(), req.prefix());
 
-        MiningTask task = blockService.buildMiningTask(
-                req.transactions(),
-                req.prefix(),
-                req.workerCount() > 0 ? req.workerCount() : 1);
+        List<MiningTask> tasks = blockService.buildMiningTasks(req.transactions(), req.prefix());
 
-        consensusService.registerTask(task);
-        taskPublisher.publishTask(task);
+        for (MiningTask task : tasks) {
+            consensusService.registerTask(task);
+            taskPublisher.publishTask(task);
+        }
 
+        MiningTask first = tasks.get(0);
+        MiningTask last = tasks.get(tasks.size() - 1);
         return ResponseEntity.ok(Map.of(
-                "taskId", task.taskId(),
-                "blockIndex", task.blockIndex(),
-                "prefix", task.prefix(),
-                "rangeMin", task.rangeMin(),
-                "rangeMax", task.rangeMax()));
+                "blockIndex", first.blockIndex(),
+                "prefix", first.prefix(),
+                "chunks", tasks.size(),
+                "rangeMin", first.rangeMin(),
+                "rangeMax", last.rangeMax()));
     }
 
     /** Estado general del coordinator. */

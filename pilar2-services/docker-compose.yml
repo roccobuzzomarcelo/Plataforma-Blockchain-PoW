@@ -70,6 +70,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:-admin}
       RABBITMQ_PASS: ${RABBITMQ_PASS:-admin123}
       MINING_PREFIX: ${MINING_PREFIX:-000}
+      MINING_CHUNK_COUNT: ${MINING_CHUNK_COUNT:-2}
       BLOCKCHAIN_API_URL: http://blockchain-api:8080
     depends_on:
       redis:

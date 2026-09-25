@@ -13,8 +13,16 @@ import org.springframework.lang.NonNull;
 @Configuration
 public class RabbitMQConfig {
 
-    // Exchange fanout: broadcast de tareas a TODOS los workers
+    // Exchange fanout: el coordinator publica una vez, la cola
+    // compartida de tareas es la única suscripta -ver más abajo-.
     public static final String MINING_EXCHANGE = "mining.tasks.exchange";
+    // Cola COMPARTIDA de tareas: todos los workers son consumidores en
+    // competencia sobre esta única cola (antes cada worker tenía su
+    // propia cola exclusiva vinculada al fanout, y recibía copia de
+    // TODA tarea -broadcast-, no una porción. Con una sola cola
+    // durable, RabbitMQ reparte cada mensaje a un solo consumidor
+    // libre, logrando la fragmentación real que pide P5).
+    public static final String TASKS_QUEUE = "mining.tasks";
     // Queue exclusiva por la que el coordinator recibe resultados
     public static final String RESULTS_QUEUE = "mining.results";
     // Exchange direct para resultados
@@ -23,6 +31,16 @@ public class RabbitMQConfig {
     @Bean
     public FanoutExchange miningExchange() {
         return new FanoutExchange(MINING_EXCHANGE, true, false);
+    }
+
+    @Bean
+    public Queue tasksQueue() {
+        return QueueBuilder.durable(TASKS_QUEUE).build();
+    }
+
+    @Bean
+    public Binding tasksBinding(Queue tasksQueue, FanoutExchange miningExchange) {
+        return BindingBuilder.bind(tasksQueue).to(miningExchange);
     }
 
     @Bean
