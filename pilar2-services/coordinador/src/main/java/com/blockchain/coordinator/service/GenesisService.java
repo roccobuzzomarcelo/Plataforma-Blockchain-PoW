@@ -9,12 +9,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
 /**
  * Crea el bloque génesis si Redis no tiene ningún bloque.
  * Se ejecuta al arrancar el Coordinator.
+ *
+ * Con 2+ réplicas del coordinator arrancando a la vez, todas verían Redis
+ * vacío en el mismo instante y crearían su propio génesis. Un lock
+ * distribuido (SET NX) en Redis asegura que solo una réplica lo cree.
  */
 @Service
 public class GenesisService {
@@ -22,6 +27,7 @@ public class GenesisService {
     private static final Logger log = LoggerFactory.getLogger(GenesisService.class);
     static final String BLOCKS_KEY = "blockchain:blocks";
     static final String BLOCK_PREFIX = "block:";
+    private static final String GENESIS_LOCK_KEY = "lock:genesis";
 
     private final RedisTemplate<String, Object> redis;
 
@@ -38,7 +44,24 @@ public class GenesisService {
             log.info("Blockchain existente encontrada ({} bloques). No se crea génesis.", count);
             return;
         }
-        createGenesis();
+
+        Boolean acquired = redis.opsForValue().setIfAbsent(GENESIS_LOCK_KEY, "locked", Duration.ofSeconds(30));
+        if (!Boolean.TRUE.equals(acquired)) {
+            log.info("Otra réplica ya está creando el génesis. No se hace nada.");
+            return;
+        }
+        try {
+            // Re-chequeo dentro del lock: por si otra réplica terminó de crearlo
+            // justo antes de que consiguiéramos el lock.
+            Long recount = redis.opsForSet().size(BLOCKS_KEY);
+            if (recount != null && recount > 0) {
+                log.info("Otra réplica creó el génesis mientras esperábamos el lock.");
+                return;
+            }
+            createGenesis();
+        } finally {
+            redis.delete(GENESIS_LOCK_KEY);
+        }
     }
 
     private void createGenesis() {
