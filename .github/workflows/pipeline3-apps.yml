@@ -1,9 +1,3 @@
-# Documentacion — el archivo que GitHub ejecuta esta en
-# .github/workflows/pipeline3-apps.yml (GitHub Actions solo corre workflows
-# ubicados ahi). Esta es una copia identica, para que la carpeta
-# pilar3-infra/pipelines/ documente las 4 pipelines sin tener que
-# salir de este directorio.
-
 # Pipeline 3 - Implementacion de cada aplicacion: frontend, blockchain-api
 # (backend), transaction-pool (split), coordinator (join), worker (3.2)
 #

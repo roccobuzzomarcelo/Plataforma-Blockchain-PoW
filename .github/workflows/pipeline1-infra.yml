@@ -1,9 +1,3 @@
-# Documentacion — el archivo que GitHub ejecuta esta en
-# .github/workflows/pipeline1-infra.yml (GitHub Actions solo corre workflows
-# ubicados ahi). Esta es una copia identica, para que la carpeta
-# pilar3-infra/pipelines/ documente las 4 pipelines sin tener que
-# salir de este directorio.
-
 # Pipeline 1 - Construccion y configuracion del entorno Kubernetes (3.2)
 #
 # Aplica pilar3-infra/opentofu: VPC, subred, cluster GKE, node pools y las

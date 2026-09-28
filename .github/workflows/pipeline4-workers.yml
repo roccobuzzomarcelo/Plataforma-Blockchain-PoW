@@ -1,9 +1,3 @@
-# Documentacion — el archivo que GitHub ejecuta esta en
-# .github/workflows/pipeline4-workers.yml (GitHub Actions solo corre workflows
-# ubicados ahi). Esta es una copia identica, para que la carpeta
-# pilar3-infra/pipelines/ documente las 4 pipelines sin tener que
-# salir de este directorio.
-
 # Pipeline 4 - Despliegue de VMs que actuan como nodos de trabajo
 # adicionales (3.2). Los mineros CPU externos al cluster (3.1); se
 # ajustan "cuando sea necesario" (P5), no de forma completamente

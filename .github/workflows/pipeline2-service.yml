@@ -1,9 +1,3 @@
-# Documentacion — el archivo que GitHub ejecuta esta en
-# .github/workflows/pipeline2-service.yml (GitHub Actions solo corre workflows
-# ubicados ahi). Esta es una copia identica, para que la carpeta
-# pilar3-infra/pipelines/ documente las 4 pipelines sin tener que
-# salir de este directorio.
-
 # Pipeline 2 - Despliegue de servicios fundamentales: Redis y RabbitMQ (3.2)
 #
 # Aplica namespaces, secrets, y los StatefulSets de infra sobre el cluster
