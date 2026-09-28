@@ -40,6 +40,17 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_OPENTOFU_SA_KEY }}
 
+      # provider.tf lee las credenciales con file(var.credentials_file), y
+      # el default de esa variable es una ruta local (~/.gcp/opentofu-key.json,
+      # la misma que se usa en las corridas interactivas). No lee la
+      # autenticacion que arriba deja lista google-github-actions/auth -asi
+      # que se escribe el secret ahi mismo, para que sea exactamente la
+      # misma ruta que ya funciona en local, sin tocar provider.tf.
+      - name: Escribir credenciales para OpenTofu
+        run: |
+          mkdir -p ~/.gcp
+          echo '${{ secrets.GCP_OPENTOFU_SA_KEY }}' > ~/.gcp/opentofu-key.json
+
       - uses: google-github-actions/setup-gcloud@v2
 
       - uses: opentofu/setup-opentofu@v1
