@@ -75,13 +75,30 @@ public class BlockService {
      * MISMO bloque.
      */
     public List<MiningTask> buildMiningTasks(List<Transaction> transactions, String prefix) {
+        return buildMiningTasks(transactions, prefix, null, null);
+    }
+
+    /**
+     * Igual que la anterior, pero permite pisar por pedido la cantidad de
+     * chunks y el tamaño total del rango de nonces (null = usar los valores
+     * configurados: mining.chunk-count y mining.range-size). Es lo que
+     * permite variar la fragmentación y el rango en las pruebas de la
+     * sección 3.3 sin reiniciar pods entre mediciones.
+     */
+    public List<MiningTask> buildMiningTasks(List<Transaction> transactions, String prefix,
+            Integer chunkCountOverride, Long rangeSizeOverride) {
         Block latest = getLatestBlock();
         int nextIndex = (latest == null) ? 1 : latest.index() + 1;
         String previousHash = (latest == null) ? "0".repeat(32) : latest.blockHash();
 
         String effectivePrefix = (prefix != null && !prefix.isBlank()) ? prefix : defaultPrefix;
-        int chunks = Math.max(1, chunkCount);
-        long chunkSize = rangeSize / chunks;
+        int chunks = (chunkCountOverride != null && chunkCountOverride > 0)
+                ? chunkCountOverride
+                : Math.max(1, chunkCount);
+        long totalRange = (rangeSizeOverride != null && rangeSizeOverride > 0)
+                ? rangeSizeOverride
+                : rangeSize;
+        long chunkSize = Math.max(1L, totalRange / chunks);
 
         List<MiningTask> tasks = new ArrayList<>();
         long start = 0;

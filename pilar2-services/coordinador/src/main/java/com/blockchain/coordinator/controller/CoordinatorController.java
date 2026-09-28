@@ -34,17 +34,21 @@ public class CoordinatorController {
 
     /**
      * Recibe un bloque formado del Transaction Pool (NCT.1).
-     * Body: { "transactions": [...], "prefix": "000" }
-     * (el campo "workerCount" que aún puede mandar transaction-pool se
-     * ignora: la cantidad de chunks ahora es mining.chunk-count, del
-     * lado del coordinator -no depende de mineros GPU conectados-.)
+     * Body: { "transactions": [...], "prefix": "000",
+     *         "chunkCount": 3, "rangeSize": 10000000 }
+     * chunkCount y rangeSize son opcionales (null = valores configurados
+     * en mining.chunk-count / mining.range-size); sirven para variar la
+     * fragmentación y el rango en las pruebas de la sección 3.3.
+     * (El campo "workerCount" que aún manda transaction-pool se ignora:
+     * la cantidad de chunks no depende de mineros GPU conectados.)
      */
     @PostMapping("/mine-block")
     public ResponseEntity<Map<String, Object>> mineBlock(@RequestBody MineBlockRequest req) {
         log.info("Solicitud de minería recibida: {} txs, prefix={}",
                 req.transactions().size(), req.prefix());
 
-        List<MiningTask> tasks = blockService.buildMiningTasks(req.transactions(), req.prefix());
+        List<MiningTask> tasks = blockService.buildMiningTasks(
+                req.transactions(), req.prefix(), req.chunkCount(), req.rangeSize());
 
         for (MiningTask task : tasks) {
             consensusService.registerTask(task);
@@ -68,13 +72,18 @@ public class CoordinatorController {
         return ResponseEntity.ok(Map.of(
                 "service", "coordinator",
                 "latestBlock", latest != null ? latest.index() : -1,
-                "latestHash", latest != null ? latest.blockHash() : "none"));
+                "latestHash", latest != null ? latest.blockHash() : "none",
+                // Lo consulta test-load/run_experiments.ps1 para detectar una
+                // imagen vieja que ignoraria chunkCount/rangeSize en silencio.
+                "supportsOverrides", true));
     }
 
     // DTO de entrada
     public record MineBlockRequest(
             List<Transaction> transactions,
             String prefix,
-            int workerCount) {
+            int workerCount,
+            Integer chunkCount,
+            Long rangeSize) {
     }
 }

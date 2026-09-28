@@ -53,6 +53,18 @@ public class BlockSchedulerService {
 
     @Scheduled(fixedDelayString = "${pool.block-interval:60}000")
     public void processBlock() {
+        processBlock(null, null, null);
+    }
+
+    /**
+     * Procesa el pool. Los tres parámetros son overrides opcionales para
+     * las pruebas de la sección 3.3 (null = comportamiento normal):
+     * - prefixOverride: prefijo exacto; NO se aplica la reducción
+     *   automática por falta de mineros GPU.
+     * - chunksOverride / rangeOverride: fragmentación y tamaño del rango
+     *   de nonces de este bloque (los interpreta el coordinator).
+     */
+    public void processBlock(String prefixOverride, Integer chunksOverride, Long rangeOverride) {
         Boolean acquired = stringRedisTemplate.opsForValue()
                 .setIfAbsent(PROCESSING_LOCK_KEY, "locked", Duration.ofSeconds(30));
         if (!Boolean.TRUE.equals(acquired)) {
@@ -70,12 +82,18 @@ public class BlockSchedulerService {
 
             log.info("Procesando {} transacciones pendientes", pending.size());
 
-            boolean gpuAvailable = minerMonitor.hasActiveGpuMiners();
-            String prefix = splitService.adjustDifficulty(gpuAvailable, defaultPrefix);
+            String prefix;
+            if (prefixOverride != null && !prefixOverride.isBlank()) {
+                prefix = prefixOverride;
+            } else {
+                boolean gpuAvailable = minerMonitor.hasActiveGpuMiners();
+                prefix = splitService.adjustDifficulty(gpuAvailable, defaultPrefix);
+            }
             int workerCount = Math.max(1, (int) minerMonitor.getActiveGpuMinerCount());
 
             // Armar el request para el coordinator
-            MineBlockRequest request = new MineBlockRequest(pending, prefix, workerCount);
+            MineBlockRequest request = new MineBlockRequest(
+                    pending, prefix, workerCount, chunksOverride, rangeOverride);
 
             try {
                 restTemplate.postForEntity(
@@ -97,6 +115,8 @@ public class BlockSchedulerService {
     public record MineBlockRequest(
             List<Transaction> transactions,
             String prefix,
-            int workerCount) {
+            int workerCount,
+            Integer chunkCount,
+            Long rangeSize) {
     }
 }

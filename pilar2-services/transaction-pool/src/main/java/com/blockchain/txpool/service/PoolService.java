@@ -39,6 +39,25 @@ public class PoolService {
         }
     }
 
+    /**
+     * Genera {@code count} transacciones sintéticas directamente en el pool
+     * (sin log por transacción). Solo para las pruebas de carga de la
+     * sección 3.3, vía /api/pool/test/generate.
+     */
+    public void generateTransactions(int count) {
+        for (int i = 0; i < count; i++) {
+            Transaction tx = Transaction.of("load-" + i, "load-" + (i + 1), 1.0 + (i % 100));
+            try {
+                String json = objectMapper.writeValueAsString(tx);
+                stringRedisTemplate.opsForValue().set(TX_KEY_PREFIX + tx.id(), json);
+                stringRedisTemplate.opsForSet().add(TX_PENDING_KEY, tx.id());
+            } catch (Exception e) {
+                throw new RuntimeException("Error generando transacción de prueba", e);
+            }
+        }
+        log.info("Generadas {} transacciones de prueba", count);
+    }
+
     public List<Transaction> getPendingTransactions() {
         Set<String> txIds = stringRedisTemplate.opsForSet().members(TX_PENDING_KEY);
         if (txIds == null || txIds.isEmpty())
