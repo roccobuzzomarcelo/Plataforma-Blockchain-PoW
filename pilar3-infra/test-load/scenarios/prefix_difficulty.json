@@ -1,0 +1,17 @@
+{
+  "name": "prefix_difficulty",
+  "description": "Tiempo de minado segun la longitud del prefijo (dificultad). Cada caracter hexadecimal multiplica por 16 el trabajo esperado (16^n hashes). El rango de nonces se agranda con el prefijo para que exista solucion con probabilidad practicamente 1. Los prefijos de 7 y 8 caracteres son lentos en CPU: el 8 es opcional (-IncludeOptional).",
+  "repetitions": 5,
+  "timeoutSec": 300,
+  "defaults": { "txCount": 10, "chunks": "auto", "range": 10000000 },
+  "runs": [
+    { "prefix": "0" },
+    { "prefix": "00" },
+    { "prefix": "000" },
+    { "prefix": "0000" },
+    { "prefix": "00000", "range": 50000000, "repetitions": 5 },
+    { "prefix": "000000", "range": 200000000, "repetitions": 5, "timeoutSec": 600 },
+    { "prefix": "0000000", "range": 3000000000, "repetitions": 3, "timeoutSec": 900 },
+    { "prefix": "00000000", "range": 60000000000, "repetitions": 1, "timeoutSec": 3600, "optional": true }
+  ]
+}

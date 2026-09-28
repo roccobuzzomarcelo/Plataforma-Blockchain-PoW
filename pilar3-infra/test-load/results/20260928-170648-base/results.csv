@@ -1,0 +1,2 @@
+﻿"timestamp","label","experiment","phase","config","rep","workers","tx_count","prefix_len_req","prefix_len_eff","chunks","range","fragment_pct","ingest_ms","ingest_server_ms","flush_ms","total_ms","status","block_index","nonce","winner","tx_in_block","note"
+"2026-09-28T17:16:02","base","fragmentation","","fragment=1%","1","3","10","6","","100","200000000","1","2879.667","","5145.87","305160.328","TIMEOUT","","","","",""

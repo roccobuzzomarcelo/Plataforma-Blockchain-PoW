@@ -1,0 +1,15 @@
+{
+  "name": "bulk_transactions",
+  "description": "Escalabilidad segun la cantidad de transacciones por bloque (1 a 100.000). Prefijo bajo y fijo, para aislar el costo de procesar bloques grandes. Hasta 100 transacciones se envian una por una por blockchain-api (camino real); desde 1000 se generan dentro del pool con /api/pool/test/generate. El caso de 100.000 es opcional (-IncludeOptional) y puede agotar la memoria de los pods: ver README.",
+  "repetitions": 3,
+  "timeoutSec": 600,
+  "defaults": { "prefix": "000", "chunks": "auto", "range": 10000000 },
+  "runs": [
+    { "txCount": 1, "repetitions": 5 },
+    { "txCount": 10, "repetitions": 5 },
+    { "txCount": 100, "repetitions": 5 },
+    { "txCount": 1000 },
+    { "txCount": 10000 },
+    { "txCount": 100000, "repetitions": 1, "timeoutSec": 1800, "optional": true }
+  ]
+}

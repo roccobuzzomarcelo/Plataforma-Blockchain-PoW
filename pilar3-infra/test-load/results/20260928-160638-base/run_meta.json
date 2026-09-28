@@ -1,0 +1,10 @@
+{
+    "label":  "base",
+    "started":  "2026-09-28T16:08:12",
+    "experiments":  "prefix",
+    "include_optional":  false,
+    "workers_at_start":  3,
+    "kubectl_context":  "gke_sdypp-rocco_us-central1-a_blockchain-cluster",
+    "pool_url":  "http://127.0.0.1:18082",
+    "api_url":  "http://127.0.0.1:18080"
+}

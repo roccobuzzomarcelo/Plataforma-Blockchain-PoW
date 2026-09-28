@@ -1,0 +1,15 @@
+{
+  "name": "pool_fragmentation",
+  "description": "Eficiencia de la distribucion segun el tamano de fragmento. fragmentPct es el tamano de cada chunk como porcentaje del rango total: 1% = 100 chunks, 50% = 2 chunks. Prefijo y rango fijos; solo cambia como se reparte el trabajo entre los workers.",
+  "repetitions": 5,
+  "timeoutSec": 300,
+  "defaults": { "prefix": "000000", "range": 200000000, "txCount": 10 },
+  "runs": [
+    { "fragmentPct": 1 },
+    { "fragmentPct": 2 },
+    { "fragmentPct": 5 },
+    { "fragmentPct": 10 },
+    { "fragmentPct": 25 },
+    { "fragmentPct": 50 }
+  ]
+}

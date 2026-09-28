@@ -1,0 +1,13 @@
+{
+  "name": "gpu_simulation",
+  "type": "gpu",
+  "description": "Ingreso y egreso de mineros GPU simulados (keep-alive). Sin GPU el pool reduce el prefijo en un caracter (P5); con un keep-alive activo usa el prefijo completo. Se usa la dificultad AUTOMATICA del pool (sin prefijo explicito), configurada con POOL_PREFIX = poolPrefix. Entre una fase con GPU y una sin GPU se espera a que expire el keep-alive (30 s).",
+  "poolPrefix": "000000",
+  "timeoutSec": 300,
+  "defaults": { "txCount": 10, "chunks": "auto", "range": 200000000 },
+  "phases": [
+    { "name": "sin_gpu_inicial", "gpu": false, "blocks": 5 },
+    { "name": "con_gpu", "gpu": true, "blocks": 5 },
+    { "name": "sin_gpu_final", "gpu": false, "blocks": 5, "waitForExpirySec": 35 }
+  ]
+}
