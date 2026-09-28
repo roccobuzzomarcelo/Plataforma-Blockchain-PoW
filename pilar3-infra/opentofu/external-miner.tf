@@ -86,9 +86,15 @@ resource "google_compute_instance_template" "external_miner" {
     startup-script = <<-EOT
       #!/bin/bash
       set -e
+      # COS monta / como solo lectura: /root/.docker no se puede crear.
+      # Con un HOME escribible, docker-credential-gcr y docker comparten
+      # el mismo config.json.
+      export HOME=/tmp
       docker-credential-gcr configure-docker --registries=${var.region}-docker.pkg.dev
 
+      docker rm -f worker || true
       docker run -d \
+        --name worker \
         --name worker \
         --restart=always \
         -p 8083:8083 \
