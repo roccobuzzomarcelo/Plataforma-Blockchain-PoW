@@ -1,0 +1,30 @@
+# Exposición TEMPORAL de RabbitMQ para el minero GPU externo
+#
+# Por qué hace falta: nuestro RabbitMQ hoy solo tiene una IP interna
+# (10.0.0.100, dentro de la VPC del proyecto). Un clúster ajeno -el que
+# preste el profesor- no puede llegar ahí. Este Service agrega un
+# LoadBalancer público, sin la anotación "Internal" que usa el de
+# infra/rabbitmq.yaml.
+#
+# CUÁNDO APLICAR: recién cuando coordines con el profesor "estoy por
+# probar", no antes. Apenas termines la prueba, borralo:
+#
+#   kubectl delete -f expose-rabbitmq-temporal.yaml
+#
+# No lo dejes aplicado de forma permanente -es un puerto AMQP abierto a
+# Internet, mitigado por el usuario restringido de abajo, pero sigue
+# siendo superficie de ataque que no hace falta mantener el resto de la
+# semana.
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-external-temp
+  namespace: blockchain-infra
+spec:
+  type: LoadBalancer
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
