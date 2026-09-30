@@ -8,6 +8,7 @@ import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFacto
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
@@ -20,6 +21,12 @@ public class RabbitMQConfig {
     public static final String TASKS_QUEUE = "mining.tasks";
     public static final String RESULTS_EXCHANGE = "mining.results.exchange";
     public static final String RESULTS_QUEUE = "mining.results";
+
+    // Debe ser EXACTAMENTE el mismo valor que en coordinador/RabbitMQConfig
+    // -si los dos lados declaran la cola con argumentos distintos, RabbitMQ
+    // rechaza la declaracion del que se conecta segundo.
+    @Value("${mining.task-ttl-ms:1800000}")
+    private int taskTtlMs;
 
     @Bean
     public ObjectMapper objectMapper() {
@@ -41,7 +48,7 @@ public class RabbitMQConfig {
     // cada mensaje a un único consumidor libre.
     @Bean
     public Queue tasksQueue() {
-        return QueueBuilder.durable(TASKS_QUEUE).build();
+        return QueueBuilder.durable(TASKS_QUEUE).ttl(taskTtlMs).build();
     }
 
     @Bean

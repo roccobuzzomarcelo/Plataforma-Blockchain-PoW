@@ -6,6 +6,7 @@ import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFacto
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
@@ -28,6 +29,18 @@ public class RabbitMQConfig {
     // Exchange direct para resultados
     public static final String RESULTS_EXCHANGE = "mining.results.exchange";
 
+    // TTL de los chunks en la cola compartida: sin esto, un chunk de un
+    // bloque ya descartado -por ejemplo, de una corrida de pruebas
+    // anterior- podia reencolarse indefinidamente cada vez que su
+    // consumidor moria a mitad de camino (comportamiento normal de
+    // AMQP), consumiendo CPU en un worker nuevo sin que nada lo
+    // detuviera nunca. 30 minutos por defecto: generoso frente a las
+    // busquedas mas lentas medidas en las pruebas de carga (hasta ~300s
+    // con prefijos dificiles), pero acota el problema a minutos en vez
+    // de dejarlo sobrevivir indefinidamente entre reinicios.
+    @Value("${mining.task-ttl-ms:1800000}")
+    private int taskTtlMs;
+
     @Bean
     public FanoutExchange miningExchange() {
         return new FanoutExchange(MINING_EXCHANGE, true, false);
@@ -35,7 +48,7 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue tasksQueue() {
-        return QueueBuilder.durable(TASKS_QUEUE).build();
+        return QueueBuilder.durable(TASKS_QUEUE).ttl(taskTtlMs).build();
     }
 
     @Bean
