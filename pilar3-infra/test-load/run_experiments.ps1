@@ -47,7 +47,16 @@ param(
     [switch]$NoClusterConfig,
     [string]$ScenarioDir = '',
     [int]$PollMs = 100,
-    [int]$MinCooldownSec = 2
+    [int]$MinCooldownSec = 2,
+    # A partir de esta cantidad de chunks en una corrida, se hace el
+    # reset completo (workers a 0, delete_queue, workers de vuelta)
+    # entre repeticiones en vez de un simple purge -ver el comentario
+    # en Invoke-OneRun.
+    [int]$HardResetChunkThreshold = 10,
+    [string]$GcpProject = 'sdypp-rocco',
+    [string]$GcpZone = 'us-central1-a',
+    [string]$MigName = 'external-miner-mig',
+    [switch]$NoExternalMiner
 )
 
 Set-StrictMode -Version 2.0
@@ -83,6 +92,15 @@ function Invoke-Kubectl {
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try { $out = & kubectl @KArgs 2>$null } finally { $ErrorActionPreference = $old }
+    if ($null -eq $out) { return @() }
+    return @($out)
+}
+
+function Invoke-Gcloud {
+    param([string[]]$GArgs)
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $out = & gcloud @GArgs 2>$null } finally { $ErrorActionPreference = $old }
     if ($null -eq $out) { return @() }
     return @($out)
 }
@@ -174,12 +192,55 @@ function Reset-Queue {
     Invoke-Kubectl @('exec', '-n', $InfraNamespace, 'rabbitmq-0', '--', 'rabbitmqctl', 'purge_queue', 'mining.tasks') | Out-Null
 }
 
+function Get-MigSize {
+    if ($NoExternalMiner) { return 0 }
+    $out = Invoke-Gcloud @('compute', 'instance-groups', 'managed', 'describe', $MigName,
+        '--zone', $GcpZone, '--project', $GcpProject, '--format=value(targetSize)')
+    $line = $out | Select-Object -First 1
+    if ($line -match '^\d+$') { return [int]$line }
+    return 0
+}
+
+function Get-WorkerReplicas {
+    $out = Invoke-Kubectl @('get', 'deployment', 'worker', '-n', $Namespace, '-o', 'jsonpath={.spec.replicas}')
+    $line = ($out -join '').Trim()
+    if ($line -match '^\d+$') { return [int]$line }
+    return 2
+}
+
+# purge_queue solo borra lo que espera en la cola, no lo que un
+# consumidor ya tiene "en vuelo" -por eso un simple purge no alcanza
+# para limpiar chunks perdedores todavia en ejecucion. Este reset baja
+# a CERO todo lo que puede tener un chunk agarrado -los pods Y la VM
+# externa, si esta activa-, borra la cola completa (no solo purge), y
+# recien ahi reconecta todo al tamano que tenia antes.
 function Invoke-HardReset {
-    Write-Log 'TIMEOUT: reinicio los workers del cluster para descartar el trabajo en curso.'
-    Reset-Queue
-    Invoke-Kubectl @('rollout', 'restart', 'deployment/worker', '-n', $Namespace) | Out-Null
+    Write-Log 'Reset completo: bajando workers y VM externa para limpiar trabajo en curso...'
+    $workerReplicas = Get-WorkerReplicas
+    $migSize = Get-MigSize
+
+    Invoke-Kubectl @('scale', 'deployment/worker', '-n', $Namespace, '--replicas=0') | Out-Null
+    if (-not $NoExternalMiner -and $migSize -gt 0) {
+        Invoke-Gcloud @('compute', 'instance-groups', 'managed', 'resize', $MigName,
+            '--zone', $GcpZone, '--project', $GcpProject, '--size=0') | Out-Null
+    }
+    Start-Sleep -Seconds 20
+
+    Invoke-Kubectl @('exec', '-n', $InfraNamespace, 'rabbitmq-0', '--', 'rabbitmqctl', 'delete_queue', 'mining.tasks') | Out-Null
+
+    Invoke-Kubectl @('scale', 'deployment/worker', '-n', $Namespace, "--replicas=$workerReplicas") | Out-Null
     Invoke-Kubectl @('rollout', 'status', 'deployment/worker', '-n', $Namespace, '--timeout=300s') | Out-Null
-    Reset-Queue
+    if (-not $NoExternalMiner -and $migSize -gt 0) {
+        Invoke-Gcloud @('compute', 'instance-groups', 'managed', 'resize', $MigName,
+            '--zone', $GcpZone, '--project', $GcpProject, "--size=$migSize") | Out-Null
+        Write-Log '  esperando a que la VM minera externa vuelva a levantar (hasta 3 min)...'
+        $deadline = (Get-Date).AddSeconds(180)
+        while ((Get-Date) -lt $deadline) {
+            if ((Get-WorkerCount) -ge ($workerReplicas + $migSize)) { break }
+            Start-Sleep -Seconds 10
+        }
+    }
+    Write-Log ('  reset listo, consumidores en mining.tasks: ' + (Get-WorkerCount))
 }
 
 # Comprueba que la API a la que apuntamos es la del cluster: la cantidad de
@@ -340,8 +401,20 @@ function Invoke-OneRun([hashtable]$Cfg) {
     }
 
     # 4. aislar la proxima corrida: vaciar la cola y dejar que terminen
-    #    los chunks que quedaron en curso en los workers
-    if ($status -eq 'TIMEOUT') { Invoke-HardReset }
+    #    los chunks que quedaron en curso en los workers.
+    #
+    # Con muchos chunks (fragmentacion alta, ej. 1% = 100 chunks), el
+    # chunk ganador confirma el bloque en segundos, pero los DEMAS
+    # chunks de ese bloque siguen buscando -nada los cancela- y un
+    # purge_queue + cooldown corto no alcanza a esperarlos. Sin este
+    # chequeo, la proxima repeticion arranca con esos perdedores
+    # todavia compitiendo por los workers, y termina en timeout aunque
+    # su propia configuracion sea perfectamente resoluble (visto en la
+    # corrida real: fragment=1% rep 1 OK en 4.2s, rep 2 TIMEOUT en
+    # 300s con la misma config).
+    if ($status -eq 'TIMEOUT' -or [int]$chunks -ge $HardResetChunkThreshold) {
+        Invoke-HardReset
+    }
     else {
         Reset-Queue
         $elapsedSec = 0
