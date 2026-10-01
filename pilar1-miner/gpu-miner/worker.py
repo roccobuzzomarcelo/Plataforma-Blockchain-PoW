@@ -45,6 +45,11 @@ RABBITMQ_PORT = int(os.environ.get("RABBITMQ_PORT", "5672"))
 RABBITMQ_USER = os.environ["RABBITMQ_USER"]
 RABBITMQ_PASS = os.environ["RABBITMQ_PASS"]
 RABBITMQ_VHOST = os.environ.get("RABBITMQ_VHOST", "/")
+# Debe coincidir EXACTAMENTE con mining.task-ttl-ms del lado Java
+# (coordinador/RabbitMQConfig.java, worker/RabbitMQConfig.java) -si no
+# coincide, RabbitMQ rechaza la redeclaracion de la cola con
+# PRECONDITION_FAILED en lugar de conectarse.
+TASK_TTL_MS = int(os.environ.get("MINING_TASK_TTL_MS", "1800000"))
 
 WORKER_ID = os.environ.get("WORKER_ID", f"gpu-worker-{socket.gethostname()}")
 MODE = os.environ.get("GPU_WORKER_MODE", "cuda")
@@ -209,7 +214,10 @@ def main():
             # (durable=True, sin exclusive/autoDelete) -se re-declara
             # igual, es idempotente, por si este worker arranca antes
             # que cualquier otro componente.
-            channel.queue_declare(queue=TASKS_QUEUE, durable=True)
+            channel.queue_declare(
+                queue=TASKS_QUEUE, durable=True,
+                arguments={"x-message-ttl": TASK_TTL_MS},
+            )
             channel.basic_qos(prefetch_count=1)  # reparto parejo entre workers, igual que el lado Java
             channel.basic_consume(queue=TASKS_QUEUE, on_message_callback=on_task)
             print(f"[{WORKER_ID}] conectado, esperando tareas en {TASKS_QUEUE}...")
