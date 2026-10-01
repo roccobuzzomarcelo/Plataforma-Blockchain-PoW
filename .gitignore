@@ -124,3 +124,6 @@ Add-Content .gitignore "`n# ================================`n# GCP CREDENCIALES
 
 # Crrespondencia personal y datos de prueba descartables
 pilar3-infra/test-load/results/
+
+# ================================
+/demo.md
